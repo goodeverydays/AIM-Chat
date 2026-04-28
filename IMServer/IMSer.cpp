@@ -1,0 +1,37 @@
+#include "IMSer.h"
+
+using namespace std::placeholders;
+
+bool IMSer::init(const std::string& ip, short port, EventLoop* loop)
+{
+	InetAddress addr(ip, port);
+	m_server.reset(new TcpServer(loop, addr, "chatserver", TcpServer::kReusePort));//创建TCP服务器对象，绑定事件循环和监听地址
+	//kReusePort选项允许多个服务器实例绑定到同一端口，提高负载均衡和性能,哪个端口链接的没了，哪个端口就会继续接受连接
+	m_server->setConnectionCallback(std::bind(&IMSer::OnConnection, this, std::placeholders::_1));
+	//std::placeholders::_1是一个占位符，表示在回调函数被调用时会传入一个参数，这个参数将被绑定到OnConnection函数的第一个参数位置
+	m_server->start();//启动服务器，开始监听和接受客户端连接
+	return true;
+}
+
+void IMSer::OnConnection(const TcpConnectionPtr& conn)
+{
+	ClientSessionPtr client(new ClientSession(conn));//创建一个新的ClientSession对象，管理这个连接的生命周期
+	m_mapclient.insert(ConnPair((std::string)*client, client));//将连接的名称和连接对象添加到映射中，方便后续根据连接ID查找和管理连接
+	//m_lstConn.push_back(client);//将新的连接添加到连接列表中，方便后续管理和广播消息
+
+}
+
+void IMSer::OnClose(const TcpConnectionPtr& conn)
+{
+	//TODO: 处理这个链接，找到这个链接在列表中的位置，并删除它
+	ConnIter iter = m_mapclient.find(conn->name());
+	if(iter != m_mapclient.end())
+	{
+		/*m_mapclient.erase(iter);*/
+		//TODO: 连接关闭，删除连接对象，释放资源
+	}
+	else
+	{
+		//TODO:有问题的连接
+	}
+}
