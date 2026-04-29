@@ -15,9 +15,19 @@ bool IMSer::init(const std::string& ip, short port, EventLoop* loop)
 
 void IMSer::OnConnection(const TcpConnectionPtr& conn)
 {
-	ClientSessionPtr client(new ClientSession(conn));//创建一个新的ClientSession对象，管理这个连接的生命周期
-	m_mapclient.insert(ConnPair((std::string)*client, client));//将连接的名称和连接对象添加到映射中，方便后续根据连接ID查找和管理连接
-	//m_lstConn.push_back(client);//将新的连接添加到连接列表中，方便后续管理和广播消息
+	if (conn->connected())
+	{
+		ClientSessionPtr client(new ClientSession(conn));//创建一个新的ClientSession对象，管理这个连接的生命周期
+		{
+			std::lock_guard<std::mutex> guard(m_sessionlock);//使用互斥锁保护对m_mapclient的访问，确保线程安全
+			//guard对象在构造时会自动锁定互斥锁，在析构时会自动释放互斥锁，确保在函数执行期间对m_mapclient的访问是安全的，避免竞争条件和数据不一致的问题
+			m_mapclient.insert(ConnPair((std::string)*client, client));//将连接的名称和连接对象添加到映射中，方便后续根据连接ID查找和管理连接
+			//m_lstConn.push_back(client);//将新的连接添加到连接列表中，方便后续管理和广播消息
+		}
+	}
+	else {
+		OnClose(conn);
+	}
 
 }
 
@@ -29,9 +39,11 @@ void IMSer::OnClose(const TcpConnectionPtr& conn)
 	{
 		/*m_mapclient.erase(iter);*/
 		//TODO: 连接关闭，删除连接对象，释放资源
+		m_mapclient.erase(iter);
 	}
 	else
 	{
 		//TODO:有问题的连接
+		std::cout << conn->name() << std::endl;
 	}
 }

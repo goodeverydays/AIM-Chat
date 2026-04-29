@@ -6,11 +6,12 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/uuid_generators.hpp>
-
+#include <iostream>
 
 using namespace muduo;
 using namespace muduo::net;
 using namespace boost::uuids;
+using namespace std::placeholders;
 
 class ClientSession//表示一个客户端会话，管理与客户端连接相关的信息和操作
 {
@@ -25,6 +26,10 @@ public:
 	{
 		return m_sessionid;
 	}
+
+	void OnRead(const muduo::net::TcpConnectionPtr& conn, Buffer* buf, Timestamp time);
+
+	void Send(const std::string& buf);
 private:
 	std::string m_sessionid;
 };
