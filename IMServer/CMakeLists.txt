@@ -5,7 +5,7 @@
 # 将源代码添加到此项目的可执行文件。
 
 #if (CMAKE_VERSION VERSION_GREATER 3.12)
-#  set_property(TARGET IMServer PROPERTY CXX_STANDARD 20)
+ # set_property(TARGET IMServer PROPERTY CXX_STANDARD 20)
 #endif()
 cmake_minimum_required (VERSION 3.12)
 
@@ -63,6 +63,10 @@ net/Timer.cc
 net/TimerQueue.cc
 )
 
+set(mysql_srcs
+mysqltool.cpp
+)
+
 set(chat_srcs  
 IMServer.cpp
 IMSer.cpp
@@ -73,7 +77,7 @@ set(file_srcs
     IMTestClient.cpp
 )
 
-add_executable (imchatserver ${chat_srcs} ${muduo_srcs})
+add_executable (imchatserver ${chat_srcs} ${muduo_srcs} ${mysql_srcs})
 #只是确认库存在或者设置库目录，是没有用的，需要链接进来才能起效果
 target_link_libraries(imchatserver mysqlclient)
 
