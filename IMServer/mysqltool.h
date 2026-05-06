@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <mysql/mysql.h>
+#include <mysql/errmsg.h>
 #include <stdio.h>
 #include <string>
 #include <sys/types.h>

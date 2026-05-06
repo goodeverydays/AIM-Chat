@@ -65,6 +65,8 @@ net/TimerQueue.cc
 
 set(mysql_srcs
 mysqltool.cpp
+Field.cpp
+QueryResult.cpp
 )
 
 set(chat_srcs  
