@@ -17,7 +17,7 @@ public:
 	MySQLTool();
 	~MySQLTool();
 	//初始化MySQL连接，连接成功返回true，失败返回false
-	bool connect(const string& host, const string& user, const string& password, const string& db);
+	bool connect(const string& host, const string& user, const string& password, const string& db, unsigned port = 3306);
 	QueryResultPtr Query(const string& sql);//执行SQL查询语句，返回查询结果
 	bool Execute(const string& sql);//执行SQL语句，返回执行结果
 	bool Execute(const string& sql, uint32_t& nAffectedCount, int& nErrno);
@@ -28,4 +28,5 @@ private:
 	string m_user;//MySQL用户名
 	string m_password;//MySQL密码
 	string m_dbname;//MySQL数据库名称
+	unsigned m_port;
 };

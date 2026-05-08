@@ -5,6 +5,7 @@ extern void mysql_close(MYSQL* sock);
 MySQLTool::MySQLTool()
 {
 	m_mysql = NULL;
+	m_port = 3306;
 }
 
 MySQLTool::~MySQLTool()
@@ -17,7 +18,7 @@ MySQLTool::~MySQLTool()
 	}
 }
 
-bool MySQLTool::connect(const string& host, const string& user, const string& passwd, const string& db)
+bool MySQLTool::connect(const string& host, const string& user, const string& passwd, const string& db, unsigned port)
 {
 	if (m_mysql != NULL)
 	{
@@ -28,7 +29,7 @@ bool MySQLTool::connect(const string& host, const string& user, const string& pa
 
 	m_mysql = mysql_init(m_mysql);
 	//mysql Ä¬ÈÏ¶Ë¿ÚÊÇ3306
-	m_mysql = mysql_real_connect(m_mysql, host.c_str(), user.c_str(), passwd.c_str(), db.c_str(), 0, NULL, 0);
+	m_mysql = mysql_real_connect(m_mysql, host.c_str(), user.c_str(), passwd.c_str(), db.c_str(), port, NULL, 0);
 	cout << host << endl << user << endl << passwd << endl << db << endl;
 	if (m_mysql != NULL)
 	{

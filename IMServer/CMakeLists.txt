@@ -67,6 +67,7 @@ set(mysql_srcs
 mysqltool.cpp
 Field.cpp
 QueryResult.cpp
+MySqlManager.cpp
 )
 
 set(chat_srcs  
