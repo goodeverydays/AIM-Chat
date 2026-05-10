@@ -4,8 +4,9 @@
 class MySqlManager 
 {
 public:
-	typedef struct fieldinfo{//
-		fieldinfo(const string& name, string& tp, const string& desc)
+	typedef struct fieldinfo{//字段信息
+		fieldinfo() = default;
+		fieldinfo(const string& name, const string& tp, const string& desc)
 		{
 			sName = name;
 			sType = tp;
@@ -16,7 +17,7 @@ public:
 		string sDesc;
 	}sFieldInfo;
 
-	typedef struct {//表结构
+	typedef struct {//表结构信息
 		string sName;
 		map<string, sFieldInfo>mapField;
 		string sKey;
@@ -33,18 +34,23 @@ public:
 	);
 
 	QueryResultPtr Query(const string& sql);
+	
 
 	//TODO:业务实现的时候追加
 private:
 	bool CheckDatabase();
-	bool CheckTable();
+	bool CheckTable(const sTableInfo& info);
 	bool CreateDatabase();
-	bool CreateTable();
-	bool UpdateTable();
+	bool CreateTable(const sTableInfo& info);
+	bool UpdateTable(const sTableInfo& info);
 
 private:
 	map<string, sTableInfo> m_mapTable;//记录
 	shared_ptr<MySQLTool> m_mysql;// 智能指针封装
 };
 
-typedef std::pair<string, sTableInfo> TablePair;
+typedef std::pair<string, MySqlManager::sTableInfo> TablePair;//定义一个键值对类型，方便插入表结构信息到映射表中，键为表名，
+typedef std::map<string, MySqlManager::sTableInfo>::iterator TableIter;//定义一个迭代器类型，方便遍历表结构信息的映射表
+typedef std::map<string, MySqlManager::sFieldInfo>::iterator FieldIter;//定义一个迭代器类型，方便遍历字段信息的映射表
+typedef std::map<string, MySqlManager::sFieldInfo>::const_iterator FieldConstIter;
+typedef pair<string, MySqlManager::sFieldInfo> FieldPair;

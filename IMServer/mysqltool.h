@@ -21,6 +21,7 @@ public:
 	QueryResultPtr Query(const string& sql);//执行SQL查询语句，返回查询结果
 	bool Execute(const string& sql);//执行SQL语句，返回执行结果
 	bool Execute(const string& sql, uint32_t& nAffectedCount, int& nErrno);
+	const string& GetDBName() const { return m_dbname; }
 	//执行SQL查询语句，返回查询结果，并获取受影响的行数和错误码
 private:
 	MYSQL* m_mysql;//MySQL连接对象

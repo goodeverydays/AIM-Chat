@@ -39,6 +39,7 @@ public:
 	int64_t toInt64() const {return atoll(m_value.c_str()); }
 	uint64_t toUint64() const {return static_cast<uint64_t>(atoll(m_value.c_str())); }
 	double toFloat() const {return atof(m_value.c_str()); }
+	const string& GetString() const { return m_value; }//获取字段值的字符串表示，返回一个字符串，表示字段的值的字符串形式，例如查询结果中的数据值的字符串形式等
 
 private:
 	string m_value;//字段值,保存查询结果中每个字段的值信息
