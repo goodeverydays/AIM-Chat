@@ -64,7 +64,8 @@ bool MySqlManager::Init(
 	unsigned port
 )
 {
-	m_mysql.reset(new MySQLTool());
+	m_mysql.reset(new MySQLTool());//创建一个MySQLTool对象，并将其封装在智能指针m_mysql中，方便管理MySQL连接的生命周期
+	//reset函数将智能指针m_mysql重置为一个新的MySQLTool对象，之前的MySQLTool对象会被自动销毁，释放与MySQL连接相关的资源，避免内存泄漏
 	if (m_mysql->connect(host, user, passwd, dbname, port) == false)
 	{
 		cout << "connect mysql failed!\r\n";

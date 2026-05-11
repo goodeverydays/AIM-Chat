@@ -77,10 +77,11 @@ QueryResultPtr MySQLTool::Query(const string& sql)
 			return QueryResultPtr();
 		}
 	}
-	MYSQL_RES* result = mysql_store_result(m_mysql);
-	uint32_t rowcount = mysql_affected_rows(m_mysql);
-	uint32_t cloumncount = mysql_field_count(m_mysql);
+	MYSQL_RES* result = mysql_store_result(m_mysql);//获取查询结果对象，包含查询结果的元数据和数据，如果查询失败或没有结果集，则返回NULL
+	uint32_t rowcount = mysql_affected_rows(m_mysql);//获取查询结果的行数，表示查询结果中包含多少行数据，如果查询失败或没有结果集，则返回0
+	uint32_t cloumncount = mysql_field_count(m_mysql);//获取查询结果的列数，表示查询结果中包含多少列数据，如果查询失败或没有结果集，则返回0
 	return QueryResultPtr (new QueryResult(result, rowcount, cloumncount));
+	//创建一个QueryResult对象，并将其封装在智能指针QueryResultPtr中返回，方便管理查询结果的生命周期，确保在程序结束时自动释放资源，避免内存泄漏
 }
 
 bool MySQLTool::Execute(const string& sql)

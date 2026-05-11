@@ -13,6 +13,25 @@ using namespace muduo::net;
 using namespace boost::uuids;
 using namespace std::placeholders;
 
+enum {
+	msg_type_unknown,
+	//用户消息
+	msg_type_heartbeart = 1000,
+	msg_type_register,
+	msg_type_login,
+	msg_type_getofriendlist,
+	msg_type_finduser,
+	msg_type_operatefriend,
+	msg_type_userstatuschange,
+	msg_type_updateuserinfo,
+	msg_type_modifypassword,
+	msg_type_creategroup,
+	msg_type_getgroupmembers,
+	//聊天消息
+	msg_type_chat = 1100,//单聊消息
+	msg_type_multichat,//单发消息
+};
+
 class ClientSession//表示一个客户端会话，管理与客户端连接相关的信息和操作
 {
 public:
@@ -30,8 +49,12 @@ public:
 	void OnRead(const muduo::net::TcpConnectionPtr& conn, Buffer* buf, Timestamp time);
 
 	void Send(const std::string& buf);
+	
+	//业务函数
+	bool Process(const TcpConnectionPtr& conn, string msgbuff);
 private:
 	std::string m_sessionid;
+	int m_seq;//会话的序号
 };
 
 typedef std::shared_ptr<ClientSession> ClientSessionPtr;//定义一个智能指针类型，方便管理ClientSession对象的生命周期

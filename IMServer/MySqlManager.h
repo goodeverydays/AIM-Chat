@@ -19,7 +19,7 @@ public:
 
 	typedef struct {//表结构信息
 		string sName;
-		map<string, sFieldInfo>mapField;
+		map<string, sFieldInfo>mapField;//表结构信息中的字段信息映射表，键为字段名称，值为字段信息，方便在程序中管理和访问字段信息
 		string sKey;
 	}sTableInfo;
 public:
@@ -45,8 +45,8 @@ private:
 	bool UpdateTable(const sTableInfo& info);
 
 private:
-	map<string, sTableInfo> m_mapTable;//记录
-	shared_ptr<MySQLTool> m_mysql;// 智能指针封装
+	map<string, sTableInfo> m_mapTable;//表结构信息的映射表，键为表名，值为表结构信息，方便在程序中管理和访问表结构信息
+	shared_ptr<MySQLTool> m_mysql;//MySQL连接工具的智能指针，方便管理MySQL连接的生命周期，确保在程序结束时自动释放资源，避免内存泄漏
 };
 
 typedef std::pair<string, MySqlManager::sTableInfo> TablePair;//定义一个键值对类型，方便插入表结构信息到映射表中，键为表名，

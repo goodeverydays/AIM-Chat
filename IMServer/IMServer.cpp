@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include "IMSer.h"
 #include "base/Singleton.h"//单例模式头文件，提供了一个全局访问点来获取IMSer实例，确保在整个程序中只有一个IMSer对象存在
+#include "MySqlManager.h"
 
 using namespace std;
 
@@ -99,10 +100,10 @@ void test(muduo::net::EventLoop& loop)
 int main(int argc, char* argv[], char* env[])
 {
 	signal(SIGCHLD, SIG_DFL);//子进程处理：SIGCHLD信号在子进程结束时发送给父进程，默认需要调用wait或waitpid避免僵尸进程
-	                         //默认处理方式：SIG_DFL表示采用系统默认处理方式，自动回收子进程资源
+	//默认处理方式：SIG_DFL表示采用系统默认处理方式，自动回收子进程资源
 	signal(SIGPIPE, SIG_IGN);//管道破裂处理：SIGPIPE信号在向已关闭的管道或套接字写入数据时发送，默认会终止进程
-							 //忽略处理方式：SIG_IGN表示忽略该信号，防止进程被意外终止，可以通过检查写操作的返回值来处理错误
-	                         //在服务器开发中，忽略SIGPIPE信号可以提高稳定性，避免因客户端断开连接而导致服务器崩溃
+	//忽略处理方式：SIG_IGN表示忽略该信号，防止进程被意外终止，可以通过检查写操作的返回值来处理错误
+	//在服务器开发中，忽略SIGPIPE信号可以提高稳定性，避免因客户端断开连接而导致服务器崩溃
 	signal(SIGINT, signal_exit);//中断错误
 	signal(SIGTERM, signal_exit);//ctrl + c
 	signal(SIGKILL, signal_exit);
@@ -110,13 +111,13 @@ int main(int argc, char* argv[], char* env[])
 	signal(SIGSEGV, signal_exit);//段错误处理：SIGSEGV信号在访问无效内存地址时发送，通常表示程序存在内存访问错误，例如访问已释放的内存、
 	signal(SIGTRAP, signal_exit);//ctrl + break
 	signal(SIGABRT, signal_exit);//abort()函数调用时发送，通常表示程序异常终止，例如内存泄漏、非法操作等
-	
+
 	cout << "imchatserver is imvoking ..." << endl;
 	int ch = 0;
 	bool is_daemon = false;
 	while ((ch = getopt(argc, argv, "d")) != -1)//getopt函数用于解析命令行参数，返回当前选项字符，如果没有更多选项则返回-1
 	{
-		cout <<"ch = " << ch << endl;
+		cout << "ch = " << ch << endl;
 		cout << "current " << optind << " value:" << argv[optind - 1] << endl;
 		switch (ch)
 		{
@@ -137,7 +138,11 @@ int main(int argc, char* argv[], char* env[])
 	muduo::net::EventLoop loop;//事件循环对象，负责处理事件和调度回调函数
 	//test();
 	//单例解决了两个问题：1.全局唯一性，确保在整个程序中只有一个实例存在；2.全局访问点，提供一个全局访问点来获取这个实例，方便在不同的地方使用它。
-	
+	if(Singleton<MySqlManager>::instance().Init("127.0.0.1", "root", "qaz000999plm", "myim") == false)
+	{
+		cout << "database init errno!\r\n";
+		return -2;
+	}
 	if (Singleton<IMSer>::instance().init("0.0.0.0", 9527, &loop) == false)//初始化服务器，绑定监听地址和事件循环
 	{
 		//Singleton<IMSer>::instance()获取IMSer类的单例实例，调用init方法进行初始化，传入监听地址、端口和事件循环对象
