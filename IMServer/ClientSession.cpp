@@ -61,9 +61,14 @@ bool ClientSession::Process(const TcpConnectionPtr& conn, string msgbuff)
 	if (reader.ReadData<int>(m_seq) == false) return false;
 	size_t dataLength = 0;
 	if (reader.ReadData<size_t>(dataLength) == false) return false;
+	string data;
+	data.resize(dataLength);
+	reader.ReadData<string>(data);
+
 	switch (cmd)
 	{
 	case msg_type_heartbeart://心跳包
+		OnHeartbeatResponse(conn, data);//调用OnHeartbeatResponse函数处理心跳响应消息
 		break;
 	case msg_type_register://注册消息
 		break;
@@ -91,4 +96,27 @@ bool ClientSession::Process(const TcpConnectionPtr& conn, string msgbuff)
 		break;
 	}
 	return true;
+}
+
+void ClientSession::OnHeartbeatResponse(const TcpConnectionPtr& conn, const string& data)
+{
+	//包的长度 4字节， 包的长度不能压缩，固定格式
+	// 包的类型 4字节 这个也不能压缩，固定格式
+	// 包的序号 4字节 这个也不能压缩， 固定格式
+	// 包的数据长度 4字节，包的数据内容 可变长度，这两个可以压缩
+	BinaryWriter writer;
+	int cmd = msg_type_heartbeart;//心跳响应消息的类型
+	writer.WriterData<int>(cmd);
+	writer.WriterData<int>(m_seq);//心跳响应消息的序号，可以根据需要进行自增或者其他操作来区分不同的响应
+	string empty;
+	writer.WriterData(empty);
+	string out = writer.toString();//将构建好的心跳响应消息转换为字符串形式，准备发送给客户端
+	writer.Clear();//清空写入器的缓冲区，为下一次构建消息做准备
+	cmd = (int)out.size();//获取包的长度
+	writer.WriterData<int>(cmd);//将心跳响应消息的长度写入消息的开头，方便客户端在接收消息时能够正确解析消息内容
+	out = writer.toString() + out;//将心跳响应消息的长度和内容组合成一个完整的消息字符串，准备发送给客户端
+	if (conn != NULL)
+	{
+		conn->send(out.c_str(), out.size());//通过连接对象的send方法将心跳响应消息发送给客户端，假设conn是一个有效的连接对象，并且能够正确发送消息
+	}
 }

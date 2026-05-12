@@ -52,6 +52,10 @@ public:
 	
 	//业务函数
 	bool Process(const TcpConnectionPtr& conn, string msgbuff);
+
+protected:
+	void OnHeartbeatResponse(const TcpConnectionPtr& conn, const string& data);//处理心跳响应消息的函数，接收客户端发送的心跳消息，并进行相应的处理，例如更新会话状态或者记录心跳时间等
+
 private:
 	std::string m_sessionid;
 	int m_seq;//会话的序号
