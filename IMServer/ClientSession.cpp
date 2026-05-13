@@ -1,6 +1,8 @@
 #include "ClientSession.h"
 #include <sstream>
 #include "BinaryReader.h"
+#include <json/json.h>//JSON库的头文件，提供了处理JSON数据的功能，例如解析和生成JSON字符串等
+#include "UserManager.h"
 
 using namespace BR;
 
@@ -71,6 +73,7 @@ bool ClientSession::Process(const TcpConnectionPtr& conn, string msgbuff)
 		OnHeartbeatResponse(conn, data);//调用OnHeartbeatResponse函数处理心跳响应消息
 		break;
 	case msg_type_register://注册消息
+		OnRegisterResponse(conn, data);//调用OnRegisterResponse函数处理注册响应消息
 		break;
 	case msg_type_login://登录消息
 		break;
@@ -106,17 +109,55 @@ void ClientSession::OnHeartbeatResponse(const TcpConnectionPtr& conn, const stri
 	// 包的数据长度 4字节，包的数据内容 可变长度，这两个可以压缩
 	BinaryWriter writer;
 	int cmd = msg_type_heartbeart;//心跳响应消息的类型
-	writer.WriterData<int>(cmd);
-	writer.WriterData<int>(m_seq);//心跳响应消息的序号，可以根据需要进行自增或者其他操作来区分不同的响应
+	writer.WriteData<int>(cmd);
+	writer.WriteData<int>(m_seq);//心跳响应消息的序号，可以根据需要进行自增或者其他操作来区分不同的响应
 	string empty;
-	writer.WriterData(empty);
-	string out = writer.toString();//将构建好的心跳响应消息转换为字符串形式，准备发送给客户端
-	writer.Clear();//清空写入器的缓冲区，为下一次构建消息做准备
-	cmd = (int)out.size();//获取包的长度
-	writer.WriterData<int>(cmd);//将心跳响应消息的长度写入消息的开头，方便客户端在接收消息时能够正确解析消息内容
-	out = writer.toString() + out;//将心跳响应消息的长度和内容组合成一个完整的消息字符串，准备发送给客户端
-	if (conn != NULL)
+	writer.WriteData(empty);
+	Send(conn,writer);//调用Send函数将构建好的心跳响应消息发送给客户端，假设Send函数已经实现，并且能够正确发送消息
+	
+}
+
+void ClientSession::OnRegisterResponse(const TcpConnectionPtr& conn, const string& data)
+{
+	//{"username" : "手机号"， "nickname" : "昵称", "password" : "密码"}
+	//解析注册请求消息的内容，假设消息内容是一个JSON字符串，包含
+	Json::Reader reader;//创建一个JSON解析器对象，用于将JSON字符串解析成JSON值对象
+	Json::Value root;//创建一个JSON值对象，用于存储解析后的JSON数据
+	if (reader.parse(data, root) == false)//调用JSON解析器的parse方法将消息内容解析成JSON值对象，如果解析失败，则返回
 	{
-		conn->send(out.c_str(), out.size());//通过连接对象的send方法将心跳响应消息发送给客户端，假设conn是一个有效的连接对象，并且能够正确发送消息
+		cout << "error json: " << data << "\r\n";
+		return;
+	}
+	if(!root["username"].isString() || !root["nickname"].isString() || !root["password"].isString())//判断解析后的JSON数据是否包含必要的字段，例如用户名、昵称和密码，如果缺少任何一个字段，则返回
+	{
+		cout << "error type:" << data << "\r\n";
+		return;
+	}
+	User user;//创建一个用户对象，用于存储注册请求中的用户信息
+	user.username = root["username"].asString();//从解析后的JSON数据中提取用户名，并将其赋值给用户对象的username成员变量
+	user.nickname = root["nickname"].asString();//从解析后的JSON数据中提取昵称，并将其赋值给用户对象的nickname成员变量
+	user.password = root["password"].asString();//从解析后的JSON数据中提取密码，并将其赋值给用户对象的password成员变量
+	BinaryWriter writer;//创建一个二进制写入器对象，用于构建注册响应消息的内容
+	string result;
+	Json::Value root;
+	writer.WriteData<int>(msg_type_register);//将注册响应消息的类型写入消息内容
+	writer.WriteData<int>(m_seq);//将注册响应消息的序号写入消息内容，假设m_seq是一个整数变量，表示当前会话的序号，可以根据需要进行自增或者其他操作来区分不同的响应
+
+	if (!Singleton<UserManager>::Instance().AddUser(user))
+	{
+		cout << "add user failed!\r\n";
+		root["code"] = 100;
+		root["message"] = "register failed!";
+		result = root.toStyledString();
+		writer.WriteData(result);
+		Send(conn, writer);
+		return;
+	}
+	else {
+		root["code"] = 0;//将注册响应消息的状态码设置为0，表示注册成功，可以根据需要定义不同的状态码来表示不同的注册结果
+		root["message"] = "ok";//将注册响应消息的提示信息设置为"注册成功"，可以根据需要定义不同的提示信息来描述注册结果
+		result = root.toStyledString();//将构建好的JSON值对象转换为一个格式化的JSON字符串，作为注册响应消息的内容
+		writer.WriteData<string>(result);//将注册响应消息的内容写入消息内容，假设result是一个字符串变量，包含了注册响应的结果信息，例如状态码和提示信息等
+		Send(conn, out);//调用Send函数将构建好的注册响应消息发送给客户端，假设Send函数已经实现，并且能够正确发送消息
 	}
 }

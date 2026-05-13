@@ -7,6 +7,7 @@
 #include "IMSer.h"
 #include "base/Singleton.h"//单例模式头文件，提供了一个全局访问点来获取IMSer实例，确保在整个程序中只有一个IMSer对象存在
 #include "MySqlManager.h"
+#include "UserManager.h"
 
 using namespace std;
 
@@ -143,6 +144,13 @@ int main(int argc, char* argv[], char* env[])
 		cout << "database init errno!\r\n";
 		return -2;
 	}
+
+	if(Singleton<UserManager>::instance().init() == false)//初始化用户管理器，加载用户信息和关系数据，如果初始化失败，则输出错误信息并返回
+	{
+		cout << "load user failed!\r\n";
+		return -3;
+	}
+
 	if (Singleton<IMSer>::instance().init("0.0.0.0", 9527, &loop) == false)//初始化服务器，绑定监听地址和事件循环
 	{
 		//Singleton<IMSer>::instance()获取IMSer类的单例实例，调用init方法进行初始化，传入监听地址、端口和事件循环对象

@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <string>
 
@@ -58,7 +59,7 @@ namespace BR {
 		string m_buffer;
 		uint32_t m_index;
 	};
-
+	
 	template<>//льюЩ
 	bool BinaryReader::ReadData(string& data)
 	{

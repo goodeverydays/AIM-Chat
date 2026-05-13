@@ -101,7 +101,11 @@ QueryResultPtr MySqlManager::Query(const string& sql)
 	return m_mysql->Query(sql);
 }
 
-
+bool MySqlManager::Execute(const string& sql)
+{
+	if (m_mysql == NULL) return false;
+	return m_mysql->Execute(sql);
+}
 
 bool MySqlManager::CheckDatabase()
 {

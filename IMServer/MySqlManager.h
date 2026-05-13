@@ -34,9 +34,10 @@ public:
 	);
 
 	QueryResultPtr Query(const string& sql);
+	//执行SQL查询语句，返回查询结果的智能指针，方便管理查询结果的生命周期，确保在程序结束时自动释放资源，避免内存泄漏
+	bool Execute(const string& sql);
+	//执行SQL语句，返回执行结果的布尔值，表示执行是否成功，可以根据需要进行错误处理和日志记录等操作
 	
-
-	//TODO:业务实现的时候追加
 private:
 	bool CheckDatabase();
 	bool CheckTable(const sTableInfo& info);

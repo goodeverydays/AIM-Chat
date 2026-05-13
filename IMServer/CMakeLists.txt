@@ -24,7 +24,7 @@ if(NOT MYSQL_LIB)
 	message(FATAL_ERROR "not found mysqlclient.so at /usr/lib64/mysql/")
 endif(NOT MYSQL_LIB)#必须进行匹配
 
-include_directories(. ./base ./net)
+include_directories(. ./base ./net ./third_party/jsoncpp/include)
 
 set(muduo_srcs
 base/Timestamp.cc
@@ -80,9 +80,12 @@ set(file_srcs
     IMTestClient.cpp
 )
 
+# jsoncpp 第三方库
+add_subdirectory(third_party/jsoncpp)
+
 add_executable (imchatserver ${chat_srcs} ${muduo_srcs} ${mysql_srcs})
 #只是确认库存在或者设置库目录，是没有用的，需要链接进来才能起效果
-target_link_libraries(imchatserver mysqlclient)
+target_link_libraries(imchatserver mysqlclient jsoncpp)
 
 add_executable (imfileserver ${file_srcs} ${muduo_srcs})
 #只是确认库存在或者设置库目录，是没有用的，需要链接进来才能起效果

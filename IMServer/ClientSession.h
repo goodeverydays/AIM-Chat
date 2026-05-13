@@ -7,6 +7,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <iostream>
+#include "BinaryReader.h"
 
 using namespace muduo;
 using namespace muduo::net;
@@ -32,7 +33,26 @@ enum {
 	msg_type_multichat,//单发消息
 };
 
-class ClientSession//表示一个客户端会话，管理与客户端连接相关的信息和操作
+class TcpSession
+{
+public:
+	TcpSession() = default;
+	~TcpSession() = default;
+	void Send(const TcpConnectionPtr& conn, BR::BinaryWriter& writer)
+	{
+		string out = writer.toString();
+		writer.Clear();
+		int	cmd = (int)out.size();//获取包的长度
+		writer.WriteData<int>(cmd);
+		out = writer.toString() + out;
+		if (conn != NULL)
+		{
+			conn->send(out.c_str(), out.size());
+		}
+	}
+};
+
+class ClientSession : public TcpSession//表示一个客户端会话，管理与客户端连接相关的信息和操作
 {
 public:
 	ClientSession(const TcpConnectionPtr& conn);
@@ -55,7 +75,7 @@ public:
 
 protected:
 	void OnHeartbeatResponse(const TcpConnectionPtr& conn, const string& data);//处理心跳响应消息的函数，接收客户端发送的心跳消息，并进行相应的处理，例如更新会话状态或者记录心跳时间等
-
+	void OnRegisterResponse(const TcpConnectionPtr& conn, const string& data);//处理注册响应消息的函数，接收客户端发送的注册请求消息，并进行相应的处理，例如验证注册信息、创建用户账户等
 private:
 	std::string m_sessionid;
 	int m_seq;//会话的序号

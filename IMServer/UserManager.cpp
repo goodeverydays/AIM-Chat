@@ -1,0 +1,121 @@
+#include "UserManager.h"
+#include "MysqlManager.h"
+#include "base/Singleton.h"
+
+using namespace std;
+using namespace muduo;
+
+bool UserManager::init()
+{
+	//加载用户信息（所有的用户）
+	if(LoadUserFromDB() != true)
+	{
+		cout << "LoadUserFromDB failed!";
+		return false;
+	}
+	//加载用户关系（好友关系）
+	for (auto& iter : m_cachedUsers)
+	{
+		if (!LoadRelationshipFromDB(iter.userid, iter.friends))
+		{
+			cout << "load friend failed!\r\n";
+		}
+	}
+	return true;
+}
+
+bool UserManager::AddUser(const User& user)
+//添加用户
+{
+	stringstream sql;
+	m_baseUserID++;//自增用户ID基数，确保每个用户都有一个唯一的ID
+	sql << "INSERT INTO t_user (f_user_id, f_username, f_nickname, f_password, f_register_time)" << 
+		"VALUES (" << m_baseUserID << ", '" << user.username << "', '" 
+		<< user.nickname << "', '" << user.password << "', NOW())";
+	//构造SQL插入语句，将用户信息插入到数据库中，假设t_user表已经存在，并且包含相应的字段
+	bool result = Singleton<MySqlManager>::instance().Execute(sql.str());//调用MySqlManager的Execute方法执行SQL语句，如果执行失败，则输出错误信息并返回false
+	if(result == false)
+	{
+		cout << "insert user failed!\r\n";
+		return false;
+	}
+	user.userid = m_baseUserID;//将生成的用户ID赋值给用户对象的userid成员变量，确保用户对象具有正确的ID信息
+	user.facetype = 0;//设置用户的默认头像类型，可以根据需要进行修改，例如根据用户的性别或者其他属性来设置不同的默认头像
+	user.birthday = 20000101;//设置用户的默认生日，可以根据需要进行修改，例如设置为一个特定的日期或者根据用户的年龄来计算默认生日
+	user.gender = 0;//设置用户的默认性别，可以根据需要进行修改，例如设置为一个特定的值来表示未知或者其他性别
+	user.ownerid = 0;//设置用户的默认群主ID，可以根据需要进行修改，例如设置为一个特定的值来表示没有群主或者其他情况
+	{
+		lock_guard<mutex> guard(m_mutex);//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
+		m_cachedUsers.push_back(user);//将用户对象添加到缓存用户信息的列表中，方便后续进行遍历和管理
+	}
+	return true;
+}
+
+bool UserManager::LoadUserFromDB()
+//从数据库加载用户信息
+{
+	stringstream sql;
+	sql << "SELECT f_user_id, f_username, f_nickname, f_password, f_facetype, f_customface,"
+		<< " f_gender, f_birthday, f_signature, f_address, f_phonenumber, f_mail FROM t_user ORDER BY f_user_id DESC";
+	//为什么用DESC：先注册的用户，id小， 后注册的用户id大，后注册的用户上线的概论大， 所以降序排列
+	QueryResultPtr result = Singleton<MySqlManager>::instance().Query(sql.str());
+	if (result == NULL)
+	{
+		return false;
+	}
+	while (result != NULL)
+	{
+		Field* pRow = result->Fetch();
+		if (pRow == NULL) break;
+		User u;
+		u.userid = pRow[0].toInt32();
+		u.username = pRow[1].GetString();
+		u.nickname = pRow[2].GetString();
+		u.password = pRow[3].GetString();
+		u.facetype = pRow[4].toInt32();
+		u.customface = pRow[5].GetString();
+		u.gender = pRow[6].toInt32();
+		u.birthday = pRow[7].toInt32();
+		u.signature = pRow[8].GetString();
+		u.address = pRow[9].GetString();
+		u.phonenumber = pRow[10].GetString();
+		u.mail = pRow[11].GetString();
+		m_cachedUsers.push_back(u);
+		if(u.userid > m_baseUserID)
+		{
+			m_baseUserID = u.userid;//更新基数，确保每个用户都有一个唯一的ID
+		}
+		if (result->NextRow() == false) break;//如果没有更多数据可供获取，跳出循环
+	}
+	result->EndQuery();//结束查询，释放资源
+	return true;
+}
+
+bool UserManager::LoadRelationshipFromDB(int32_t userid, set<int32_t>& friends)
+//从数据库加载用户关系信息，例如好友关系等
+{
+	stringstream sql << "SELECT f_user_id1, f_user_id2 FROM t_user_relationship WHERE f_user_id1 = " << userid << " OR f_user_id2 = " << userid " ;";
+	QueryResultPtr result = Singleton<MySqlManager>::instance().Query(sql.str());
+	if (result == NULL)
+	{
+		return false;
+	}
+	while (result != NULL)
+	{
+		Field* pRow = result->Fetch();
+		if (pRow == NULL) break;
+		int friendid1 = pRow[0].toInt32();
+		int friendid2 = pRow[1].toInt32();
+		if (friendid1 == userid)//如果查询结果中的用户ID1与当前用户ID匹配，说明用户ID2是当前用户的好友，将其插入到好友列表中
+		{
+			friends.insert(friendid2);
+		}
+		else if (friendid2 == userid)
+		{
+			friends.insert(friendid1);
+		}
+		if (result->NextRow() == false) break;//如果没有更多数据可供获取，跳出循环
+	}
+	result->EndQuery();//结束查询，释放资源
+	return true;
+}
