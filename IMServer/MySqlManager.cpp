@@ -80,18 +80,23 @@ bool MySqlManager::Init(
 			return false;
 		}
 	}
+	cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	TableIter it = m_mapTable.begin();
 	for (; it != m_mapTable.end(); it++)
 	{
+		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 		if (CheckTable(it->second) == false)
 		{
+			cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 			if(CreateTable(it->second) == false)
-				{
+			{
 					cout << "create table " << it->second.sName << " failed!\r\n";
 					return false;
 			}
 		}
+		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	}
+	cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	return true;
 }
 
@@ -116,6 +121,7 @@ bool MySqlManager::CheckDatabase()
 		cout << "no database found in mysql!\r\n";
 		return false;
 	}
+	cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	Field* pRow = result->Fetch();
 	string dbname = m_mysql->GetDBName();
 	while (pRow)
@@ -123,6 +129,7 @@ bool MySqlManager::CheckDatabase()
 		string name = pRow[0].GetString();
 		if (name == dbname)//如果查询结果中的数据库名称与当前连接的数据库名称匹配，说明数据库存在，返回true
 		{
+			cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 			result->EndQuery();//结束查询，释放资源
 			return true;
 		}
@@ -156,6 +163,7 @@ bool MySqlManager::CheckTable(const sTableInfo& info)
 	stringstream sql;//构造SQL查询语句，检查表是否存在
 	sql << "desc " << info.sName << ";";
 	QueryResultPtr result = m_mysql->Query(sql.str());
+	cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	if (result == NULL)
 	{
 		if(CreateTable(info) == false)
@@ -165,19 +173,23 @@ bool MySqlManager::CheckTable(const sTableInfo& info)
 		}
 		return true;
 	}
+	cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	map<string, sFieldInfo> rest;
 	rest.insert(info.mapField.begin(), info.mapField.end());//将表结构信息中的字段信息插入到rest映射表中，方便后续检查字段信息的匹配情况
 	map<string, sFieldInfo> mapChange;
 	
 	Field* pRow = result->Fetch();//获取查询结果的第一行数据，返回一个指向Field对象的指针，表示表结构信息的第一行数据
+	cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	while(pRow)
 	{
 		string name = pRow[0].GetString();
 		string type = pRow[1].GetString();//获取字段名称和类型信息，分别保存在name和type字符串中
 		FieldConstIter iter = info.mapField.find(name);
+		cout << __FILE__ << "(" << __LINE__ << "): " << name << " type"  << type << "\r\n";
+
 		if (iter == info.mapField.end())
 		{
-			continue;//如果表结构信息中没有找到匹配的字段名称，说明该字段不存在，继续检查下一个字段
+			continue;
 		}
 		rest.erase(name);//如果表结构信息中找到了匹配的字段名称，说明该字段存在，从rest映射表中删除该字段信息，表示该字段已经匹配成功
 		if (iter->second.sType != type)
@@ -187,8 +199,9 @@ bool MySqlManager::CheckTable(const sTableInfo& info)
 		}
 		if(result->NextRow() == false) break;//如果没有更多数据可供获取，跳出循环
 		pRow = result->Fetch();//继续获取下一行数据，直到没有更多数据可供获取
-
+		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	}
+	cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	result->EndQuery();
 	if (rest.size() > 0)
 	{//补全缺掉的列

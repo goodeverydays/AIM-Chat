@@ -42,8 +42,8 @@ public:
 	{
 		string out = writer.toString();
 		writer.Clear();
-		int	cmd = (int)out.size();//获取包的长度
-		writer.WriteData<int>(cmd);
+		int	len = (int)out.size();//获取包的长度
+		writer.WriteData<int>(len);
 		out = writer.toString() + out;
 		if (conn != NULL)
 		{
@@ -67,8 +67,6 @@ public:
 	}
 
 	void OnRead(const muduo::net::TcpConnectionPtr& conn, Buffer* buf, Timestamp time);
-
-	void Send(const std::string& buf);
 	
 	//业务函数
 	bool Process(const TcpConnectionPtr& conn, string msgbuff);
@@ -76,6 +74,7 @@ public:
 protected:
 	void OnHeartbeatResponse(const TcpConnectionPtr& conn, const string& data);//处理心跳响应消息的函数，接收客户端发送的心跳消息，并进行相应的处理，例如更新会话状态或者记录心跳时间等
 	void OnRegisterResponse(const TcpConnectionPtr& conn, const string& data);//处理注册响应消息的函数，接收客户端发送的注册请求消息，并进行相应的处理，例如验证注册信息、创建用户账户等
+	void OnLoginResponse(const TcpConnectionPtr& conn, const string& data);//处理登录响应消息的函数，接收客户端发送的登录请求消息，并进行相应的处理，例如验证登录信息、创建会话等
 private:
 	std::string m_sessionid;
 	int m_seq;//会话的序号

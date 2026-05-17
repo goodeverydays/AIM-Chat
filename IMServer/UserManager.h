@@ -45,10 +45,12 @@ public:
 	UserManager& operator=(const UserManager&) = delete;
 
 	//添加用户
-	bool AddUser(const User& user);
+	bool AddUser(User& user);
 	//从数据库加载用户信息
 	bool LoadUserFromDB();
 	bool LoadRelationshipFromDB(int32_t userid, set<int32_t>& friends);//从数据库加载用户关系信息，例如好友关系等
+	bool GetUserInfoUsername(const string& name, User& user);
+private:
 	mutex m_mutex;//互斥锁对象，用于保护对用户信息的访问和修改，确保线程安全，避免数据竞争和不一致的问题
 	list<User> m_cachedUsers;//缓存用户信息的列表，可以使用list容器来存储用户对象，方便进行遍历和管理
 	int32_t m_baseUserID{ 0 };//用于生成新的用户ID的基数，可以根据需要进行自增或者其他操作来确保每个用户都有一个唯一的ID

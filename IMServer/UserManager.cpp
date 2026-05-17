@@ -1,6 +1,7 @@
 #include "UserManager.h"
-#include "MysqlManager.h"
+#include "MySqlManager.h"
 #include "base/Singleton.h"
+#include <sstream>
 
 using namespace std;
 using namespace muduo;
@@ -24,7 +25,7 @@ bool UserManager::init()
 	return true;
 }
 
-bool UserManager::AddUser(const User& user)
+bool UserManager::AddUser(User& user)
 //添加用户
 {
 	stringstream sql;
@@ -80,7 +81,10 @@ bool UserManager::LoadUserFromDB()
 		u.address = pRow[9].GetString();
 		u.phonenumber = pRow[10].GetString();
 		u.mail = pRow[11].GetString();
-		m_cachedUsers.push_back(u);
+		{
+			lock_guard<mutex> guard(m_mutex);//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
+			m_cachedUsers.push_back(u);
+		}
 		if(u.userid > m_baseUserID)
 		{
 			m_baseUserID = u.userid;//更新基数，确保每个用户都有一个唯一的ID
@@ -94,7 +98,8 @@ bool UserManager::LoadUserFromDB()
 bool UserManager::LoadRelationshipFromDB(int32_t userid, set<int32_t>& friends)
 //从数据库加载用户关系信息，例如好友关系等
 {
-	stringstream sql << "SELECT f_user_id1, f_user_id2 FROM t_user_relationship WHERE f_user_id1 = " << userid << " OR f_user_id2 = " << userid " ;";
+	stringstream sql;
+	sql << "SELECT f_user_id1, f_user_id2 FROM t_user_relationship WHERE f_user_id1 = " << userid << " OR f_user_id2 = " << userid << " ;";
 	QueryResultPtr result = Singleton<MySqlManager>::instance().Query(sql.str());
 	if (result == NULL)
 	{
@@ -118,4 +123,18 @@ bool UserManager::LoadRelationshipFromDB(int32_t userid, set<int32_t>& friends)
 	}
 	result->EndQuery();//结束查询，释放资源
 	return true;
+}
+
+bool UserManager::GetUserInfoUsername(const string& name, User& user)
+{
+	lock_guard<mutex> guard(m_mutex);//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
+	for (const auto& iter : m_cachedUsers)
+	{
+		if (iter.username == name)//遍历缓存用户信息的列表，查找与给定用户名匹配的用户对象，如果找到，则将其赋值给参数user，并返回true
+		{
+			user = iter;
+			return true;
+		}
+	}
+	return false;//如果没有找到匹配的用户对象，则返回false
 }

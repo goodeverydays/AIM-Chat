@@ -74,6 +74,8 @@ set(chat_srcs
 IMServer.cpp
 IMSer.cpp
 ClientSession.cpp
+UserManager.cpp
+BinaryReader.cpp
 )
 
 set(file_srcs 

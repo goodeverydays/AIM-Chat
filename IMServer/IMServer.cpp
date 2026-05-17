@@ -144,13 +144,13 @@ int main(int argc, char* argv[], char* env[])
 		cout << "database init errno!\r\n";
 		return -2;
 	}
-
+	cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	if(Singleton<UserManager>::instance().init() == false)//初始化用户管理器，加载用户信息和关系数据，如果初始化失败，则输出错误信息并返回
 	{
 		cout << "load user failed!\r\n";
 		return -3;
 	}
-
+	cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	if (Singleton<IMSer>::instance().init("0.0.0.0", 9527, &loop) == false)//初始化服务器，绑定监听地址和事件循环
 	{
 		//Singleton<IMSer>::instance()获取IMSer类的单例实例，调用init方法进行初始化，传入监听地址、端口和事件循环对象

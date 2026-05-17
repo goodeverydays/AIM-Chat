@@ -4,6 +4,7 @@
 #include <json/json.h>//JSON库的头文件，提供了处理JSON数据的功能，例如解析和生成JSON字符串等
 #include "UserManager.h"
 
+
 using namespace BR;
 
 ClientSession::ClientSession(const TcpConnectionPtr& conn)
@@ -50,10 +51,7 @@ void ClientSession::OnRead(const TcpConnectionPtr& conn, Buffer* buf, Timestamp 
 
 }
 
-void ClientSession::Send(const std::string& buf)
-{
-	//TODO: 发送消息给客户端，可以通过连接对象的send方法将消息发送出去，例如conn->send(buf);
-}
+
 
 bool ClientSession::Process(const TcpConnectionPtr& conn, string msgbuff)
 {
@@ -76,6 +74,7 @@ bool ClientSession::Process(const TcpConnectionPtr& conn, string msgbuff)
 		OnRegisterResponse(conn, data);//调用OnRegisterResponse函数处理注册响应消息
 		break;
 	case msg_type_login://登录消息
+		OnLoginResponse(conn, data);//调用OnLoginResponse函数处理登录响应消息
 		break;
 	case msg_type_getofriendlist://获取好友列表
 		break;
@@ -121,43 +120,129 @@ void ClientSession::OnRegisterResponse(const TcpConnectionPtr& conn, const strin
 {
 	//{"username" : "手机号"， "nickname" : "昵称", "password" : "密码"}
 	//解析注册请求消息的内容，假设消息内容是一个JSON字符串，包含
+	string result;
+	BinaryWriter writer;//创建一个二进制写入器对象，用于构建注册响应消息的内容
 	Json::Reader reader;//创建一个JSON解析器对象，用于将JSON字符串解析成JSON值对象
-	Json::Value root;//创建一个JSON值对象，用于存储解析后的JSON数据
+	Json::Value root, response;//创建一个JSON值对象，用于存储解析后的JSON数据
+	int cmd = msg_type_register;//注册响应消息的类型，可以根据需要定义不同的类型来表示不同的响应，例如注册成功、注册失败等
+	writer.WriteData<int>(cmd);//将注册响应消息的类型写入消息内容
+	writer.WriteData<int>(m_seq);//将注册响应消息的序号写入消息内容，假设m_seq是一个整数变量，表示当前会话的序号，可以根据需要进行自增或者其他操作来区分不同的响应
+
 	if (reader.parse(data, root) == false)//调用JSON解析器的parse方法将消息内容解析成JSON值对象，如果解析失败，则返回
 	{
 		cout << "error json: " << data << "\r\n";
+		response["code"] = 101;
+		response["message"] = "json parse failed!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		Send(conn, writer);
 		return;
 	}
 	if(!root["username"].isString() || !root["nickname"].isString() || !root["password"].isString())//判断解析后的JSON数据是否包含必要的字段，例如用户名、昵称和密码，如果缺少任何一个字段，则返回
 	{
 		cout << "error type:" << data << "\r\n";
+		response["code"] = 102;
+		response["message"] = "json data type failed!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		Send(conn, writer);
 		return;
 	}
 	User user;//创建一个用户对象，用于存储注册请求中的用户信息
 	user.username = root["username"].asString();//从解析后的JSON数据中提取用户名，并将其赋值给用户对象的username成员变量
 	user.nickname = root["nickname"].asString();//从解析后的JSON数据中提取昵称，并将其赋值给用户对象的nickname成员变量
 	user.password = root["password"].asString();//从解析后的JSON数据中提取密码，并将其赋值给用户对象的password成员变量
-	BinaryWriter writer;//创建一个二进制写入器对象，用于构建注册响应消息的内容
-	string result;
-	Json::Value root;
-	writer.WriteData<int>(msg_type_register);//将注册响应消息的类型写入消息内容
-	writer.WriteData<int>(m_seq);//将注册响应消息的序号写入消息内容，假设m_seq是一个整数变量，表示当前会话的序号，可以根据需要进行自增或者其他操作来区分不同的响应
-
-	if (!Singleton<UserManager>::Instance().AddUser(user))
+	
+	if (!Singleton<UserManager>::instance().AddUser(user))
 	{
 		cout << "add user failed!\r\n";
-		root["code"] = 100;
-		root["message"] = "register failed!";
-		result = root.toStyledString();
+		response["code"] = 100;
+		response["message"] = "register failed!";
+		result = response.toStyledString();
 		writer.WriteData(result);
 		Send(conn, writer);
 		return;
 	}
 	else {
-		root["code"] = 0;//将注册响应消息的状态码设置为0，表示注册成功，可以根据需要定义不同的状态码来表示不同的注册结果
-		root["message"] = "ok";//将注册响应消息的提示信息设置为"注册成功"，可以根据需要定义不同的提示信息来描述注册结果
-		result = root.toStyledString();//将构建好的JSON值对象转换为一个格式化的JSON字符串，作为注册响应消息的内容
+		response["code"] = 0;//将注册响应消息的状态码设置为0，表示注册成功，可以根据需要定义不同的状态码来表示不同的注册结果
+		response["message"] = "ok";//将注册响应消息的提示信息设置为"注册成功"，可以根据需要定义不同的提示信息来描述注册结果
+		result = response.toStyledString();//将构建好的JSON值对象转换为一个格式化的JSON字符串，作为注册响应消息的内容
 		writer.WriteData<string>(result);//将注册响应消息的内容写入消息内容，假设result是一个字符串变量，包含了注册响应的结果信息，例如状态码和提示信息等
-		Send(conn, out);//调用Send函数将构建好的注册响应消息发送给客户端，假设Send函数已经实现，并且能够正确发送消息
+		Send(conn, writer);//调用Send函数将构建好的注册响应消息发送给客户端，假设Send函数已经实现，并且能够正确发送消息
 	}
+}
+
+void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& data)
+{
+	//
+	BinaryWriter writer;
+	string result;
+	Json::Reader reader;
+	Json::Value root, response;
+	int cmd = msg_type_login;
+	writer.WriteData<int>(cmd);
+	writer.WriteData(m_seq);
+
+	if (reader.parse(data, root) == false)
+	{
+		response["code"] = 101;
+		response["message"] = "json parse failed!";
+		result = root.toStyledString();
+		writer.WriteData(result);
+		Send(conn, writer);
+		return;
+	}
+
+	if(!root["username"].isString() || !root["password"].isString() || !root["clienttype"].isInt() ||
+		!root["status"].isInt())
+	{
+		response["code"] = 102;
+		response["message"] = "json data type failed!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		Send(conn, writer);
+		return;
+	}
+	string username = root["username"].asString();
+	string password = root["password"].asString();
+	User user;
+	if (Singleton<UserManager>::instance().GetUserInfoUsername(username, user) == false)
+	{
+		//TODO::去数据库查找
+		response["code"] = 103;
+		response["message"] = "user is not exist or password is incorrect!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		Send(conn, writer);
+		return;
+	}
+	
+	if (password != user.password)
+	{
+		response["code"] = 104;
+		response["msg"] = "user is not exist or password is incorrect!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		Send(conn, writer);
+		return;
+	}
+
+
+	//如果成功返回应答
+	response["code"] = 0;
+	response["msg"] = "ok";
+	response["userid"] = user.userid;
+	response["username"] = user.username;
+	response["nickname"] = user.nickname;
+	response["facetype"] = user.facetype;
+	response["customface"] = user.customface;
+	response["gender"] = user.gender;
+	response["birthday"] = user.birthday;
+	response["signature"] = user.signature;
+	response["adress"] = user.address;
+	response["phonenumber"] = user.phonenumber;
+	response["mail"] = user.mail;
+	result = response.toStyledString();
+	writer.WriteData(result);
+	Send(conn, writer);
 }

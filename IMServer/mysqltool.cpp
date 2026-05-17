@@ -106,6 +106,7 @@ bool MySQLTool::Execute(const string& sql, uint32_t& nAffectedCount, int& nErrno
 	{
 		uint32_t nErrno = mysql_errno(m_mysql);
 		cout << "mysql_query call failed! code is " << nErrno << endl;
+		cout << "mysql_query call failed! msg : " << mysql_error(m_mysql) << endl;
 		if (CR_SERVER_GONE_ERROR == nErrno)
 		{
 			if (connect(m_host, m_user, m_password, m_dbname) == false)
