@@ -50,10 +50,24 @@ public:
 	bool LoadUserFromDB();
 	bool LoadRelationshipFromDB(int32_t userid, set<int32_t>& friends);//从数据库加载用户关系信息，例如好友关系等
 	bool GetUserInfoUsername(const string& name, User& user);
+	bool GetFriendInfoByUserID(int32_t userid, list<UserPtr>& friends);
+	UserPtr GetUserInfoByID(int32_t userid);
+	bool MakeFriendRelationship(int32_t smallid, int32_t greatid);
+	bool ReleaseFriendRelationship(int32_t smallid, int32_t greatid);
+	bool UpdateUserInfo(int32_t userid, const User& newuserinfo);
+	bool ModifyUserPassword(int32_t userid, const string& newpassword);
+	bool AddGroup(const char* groupname, int32_t ownerid, int32_t& groupid);
+	bool SaveChatMsgToDb(int32_t senderid, int32_t targetid, const string& chatmsg);
+	bool DeleteFriendToUser(int32_t smallid, int32_t friendid);
+
 private:
 	mutex m_mutex;//互斥锁对象，用于保护对用户信息的访问和修改，确保线程安全，避免数据竞争和不一致的问题
 	list<User> m_cachedUsers;//缓存用户信息的列表，可以使用list容器来存储用户对象，方便进行遍历和管理
+	map<int32_t, UserPtr> m_mapUsers;//用户ID与用户对象的映射关系，可以使用map容器来存储用户ID和用户对象的对应关系，方便根据用户ID快速查找用户信息
 	int32_t m_baseUserID{ 0 };//用于生成新的用户ID的基数，可以根据需要进行自增或者其他操作来确保每个用户都有一个唯一的ID
 	int32_t m_baseGroupID{ 0xFFFFFFF };//用于生成新的群ID的基数，可以根据需要进行自增或者其他操作来确保每个群都有一个唯一的ID
 	
 };
+
+typedef map<int32_t, UserPtr>::iterator iterMapUser;
+typedef set<int32_t>::iterator iterSetUserID;

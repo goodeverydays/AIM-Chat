@@ -82,22 +82,33 @@ bool ClientSession::Process(const TcpConnectionPtr& conn, string msgbuff)
 		OnLoginResponse(conn, data);//调用OnLoginResponse函数处理登录响应消息
 		break;
 	case msg_type_getofriendlist://获取好友列表
+		OnGetFriendListResponse(conn, data);
 		break;
 	case msg_type_finduser://查找用户
+		OnFindUserResponse(conn, data);
 		break;
 	case msg_type_operatefriend://操作好友
+		OnOperateFriendResponse(conn, data);
 		break;
 	case msg_type_updateuserinfo://更新用户信息
+		OnUpdateUserInfoResponse(conn, data);
 		break;
 	case msg_type_modifypassword://修改密码
+		OnModifyPasswordResponse(conn, data);
 		break;
 	case msg_type_creategroup://创建群聊
+		OnCreateGroupResponse(conn, data);
 		break;
 	case msg_type_getgroupmembers://获取群成员
+		OnGetGroupMembersResponse(conn, data);
 		break;
 	case msg_type_chat://单聊信息
+		reader.ReadData(m_target);
+		OnChatResponse(conn, data);
 		break;
 	case msg_type_multichat://群聊信息
+		reader.ReadData(m_targets);
+		OnMultiChatResponse(conn, data);
 		break;
 	default:
 		break;
@@ -117,8 +128,8 @@ void ClientSession::OnHeartbeatResponse(const TcpConnectionPtr& conn, const stri
 	writer.WriteData(htonl(m_seq));//心跳响应消息的序号，可以根据需要进行自增或者其他操作来区分不同的响应
 	string empty;
 	writer.WriteData(empty);
-	Send(conn,writer);//调用Send函数将构建好的心跳响应消息发送给客户端，假设Send函数已经实现，并且能够正确发送消息
-	
+	TcpSession::Send(conn,writer);//调用Send函数将构建好的心跳响应消息发送给客户端，假设Send函数已经实现，并且能够正确发送消息
+	printf("%s(%d): %s\r\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 void ClientSession::OnRegisterResponse(const TcpConnectionPtr& conn, const string& data)
@@ -140,7 +151,7 @@ void ClientSession::OnRegisterResponse(const TcpConnectionPtr& conn, const strin
 		response["message"] = "json parse failed!";
 		result = response.toStyledString();
 		writer.WriteData(result);
-		Send(conn, writer);
+		TcpSession::Send(conn, writer);
 		return;
 	}
 	if(!root["username"].isString() || !root["nickname"].isString() || !root["password"].isString())//判断解析后的JSON数据是否包含必要的字段，例如用户名、昵称和密码，如果缺少任何一个字段，则返回
@@ -150,7 +161,7 @@ void ClientSession::OnRegisterResponse(const TcpConnectionPtr& conn, const strin
 		response["message"] = "json data type failed!";
 		result = response.toStyledString();
 		writer.WriteData(result);
-		Send(conn, writer);
+		TcpSession::Send(conn, writer);
 		return;
 	}
 	User user;//创建一个用户对象，用于存储注册请求中的用户信息
@@ -165,15 +176,16 @@ void ClientSession::OnRegisterResponse(const TcpConnectionPtr& conn, const strin
 		response["message"] = "register failed!";
 		result = response.toStyledString();
 		writer.WriteData(result);
-		Send(conn, writer);
-		return;
+		TcpSession::Send(conn, writer);
+		printf("%s(%d): %s\r\n", __FILE__, __LINE__, __FUNCTION__);
 	}
 	else {
 		response["code"] = 0;//将注册响应消息的状态码设置为0，表示注册成功，可以根据需要定义不同的状态码来表示不同的注册结果
 		response["message"] = "ok";//将注册响应消息的提示信息设置为"注册成功"，可以根据需要定义不同的提示信息来描述注册结果
 		result = response.toStyledString();//将构建好的JSON值对象转换为一个格式化的JSON字符串，作为注册响应消息的内容
 		writer.WriteData<string>(result);//将注册响应消息的内容写入消息内容，假设result是一个字符串变量，包含了注册响应的结果信息，例如状态码和提示信息等
-		Send(conn, writer);//调用Send函数将构建好的注册响应消息发送给客户端，假设Send函数已经实现，并且能够正确发送消息
+		TcpSession::Send(conn, writer);//调用Send函数将构建好的注册响应消息发送给客户端，假设Send函数已经实现，并且能够正确发送消息
+		printf("%s(%d): %s\r\n", __FILE__, __LINE__, __FUNCTION__);
 	}
 }
 
@@ -190,22 +202,24 @@ void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& 
 
 	if (reader.parse(data, root) == false)
 	{
+		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 		response["code"] = 101;
 		response["message"] = "json parse failed!";
 		result = root.toStyledString();
 		writer.WriteData(result);
-		Send(conn, writer);
+		TcpSession::Send(conn, writer);
 		return;
 	}
 
 	if(!root["username"].isString() || !root["password"].isString() || !root["clienttype"].isInt() ||
 		!root["status"].isInt())
 	{
+		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 		response["code"] = 102;
 		response["message"] = "json data type failed!";
 		result = response.toStyledString();
 		writer.WriteData(result);
-		Send(conn, writer);
+		TcpSession::Send(conn, writer);
 		return;
 	}
 	string username = root["username"].asString();
@@ -213,22 +227,23 @@ void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& 
 	User user;
 	if (Singleton<UserManager>::instance().GetUserInfoUsername(username, user) == false)
 	{
-		//TODO::去数据库查找
+		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 		response["code"] = 103;
 		response["message"] = "user is not exist or password is incorrect!";
 		result = response.toStyledString();
 		writer.WriteData(result);
-		Send(conn, writer);
+		TcpSession::Send(conn, writer);
 		return;
 	}
 	
 	if (password != user.password)
 	{
+		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 		response["code"] = 104;
 		response["msg"] = "user is not exist or password is incorrect!";
 		result = response.toStyledString();
 		writer.WriteData(result);
-		Send(conn, writer);
+		TcpSession::Send(conn, writer);
 		return;
 	}
 
@@ -236,18 +251,64 @@ void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& 
 	//如果成功返回应答
 	response["code"] = 0;
 	response["msg"] = "ok";
-	response["userid"] = user.userid;
-	response["username"] = user.username;
-	response["nickname"] = user.nickname;
-	response["facetype"] = user.facetype;
-	response["customface"] = user.customface;
-	response["gender"] = user.gender;
-	response["birthday"] = user.birthday;
-	response["signature"] = user.signature;
-	response["address"] = user.address;
-	response["phonenumber"] = user.phonenumber;
-	response["mail"] = user.mail;
+	response["userid"] = m_user->userid;
+	response["username"] = m_user->username;
+	response["nickname"] = m_user->nickname;
+	response["facetype"] = m_user->facetype;
+	response["customface"] = m_user->customface;
+	response["gender"] = m_user->gender;
+	response["birthday"] = m_user->birthday;
+	response["signature"] = m_user->signature;
+	response["address"] = m_user->address;
+	response["phonenumber"] = m_user->phonenumber;
+	response["mail"] = m_user->mail;
+	m_user->status = 1;//将用户的状态设置为在线，可以根据需要定义不同的状态值来表示用户的在线状态，例如0表示离线，1表示在线等
 	result = response.toStyledString();
 	writer.WriteData(result);
-	Send(conn, writer);
+	TcpSession::Send(conn, writer);
+	//推送通知信息
+	list<NotifyMsgCache> listNotifyCache;
+	Singleton<MsgCacheManager>::instance().GetNotifyMsgCache(m_user->userid, listNotifyCache);
+	for (const auto& iter : listNotifyCache)
+	{
+		writer = iter.notifymsg;
+		TcpSession::Send(conn, writer);
+	}
+	//推送聊天消息
+	list<ChatMsgCache>listChatCache;
+	Singleton<MsgCacheManager>::instance().GetChatMsgCache(m_user->userid, listChatCache);
+	for (const auto& iter : listChatCache)
+	{
+		writer = iter.chatmsg;
+		TcpSession::Send(conn, writer);
+	}
+
+	//给其他用户推送上线信息
+	list<UserPtr> friends;
+	Singleton<UserManager>::instance().GetFriendInfoByUserId(m_user->userid, friends);
+	IMServer& imserver = Singleton<IMSer>::instance();
+	for (const auto& iter : friends)
+	{
+		ClientSessionPtr targetSession = imserver.GetSessionByID(iter->userid);
+		if (targetSession)
+		{
+			printf("%s(%d): %s userid %d target %d\r\n", __FILE__, __LINE__, __FUNCTION__, m_user->userid, targetSession->UserID());
+			targetSession->SendUserStatusChangeMsg(m_user->userid, 1);//调用SendUserStatusChangeMsg函数向好友发送用户状态变化消息，通知好友用户的状态发生了变化，例如上线、离线等，假设SendUserStatusChangeMsg函数已经实现，并且能够正确发送消息
+		}
+	}
+	printf("%s(%d) : %s userid %d\r\n", __FILE__, __LINE__, __FUNCTION__, m_user->userid);
+}
+
+void ClientSession::OnGetFriendListResponse(const TcpConnectionPtr& conn, const string& data)
+{
+	std::list<UserPtr> lstFriend;
+	Singleton<UserManager>::instance().GetFriendInfoByUserID(m_user->userid, lstFriends);
+	Json::Value root;
+	root["code"] = 0;
+	root["msg"] = "ok";
+	root["userinfo"] = Json::Value(Json::arrayValue);
+	for (const auto& iter : lstFriends)
+	{
+
+	}
 }

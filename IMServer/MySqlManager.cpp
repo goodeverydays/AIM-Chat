@@ -198,11 +198,8 @@ bool MySqlManager::CheckTable(const sTableInfo& info)
 		if (iter->second.sDesc != type)
 		{
 			mapChange.insert(FieldPair(name, iter->second));//如果表结构信息中的字段类型与查询结果中的字段类型不匹配，说明该字段需要更新，将字段名称和字段信息插入到mapChange映射表中，方便后续更新字段
-			if (result->NextRow() == false) break;
-			pRow = result->Fetch();
-			break;
 		}
-		if(result->NextRow() == false) break;//如果没有更多数据可供获取，跳出循环
+		if (result->NextRow() == false) break;//如果没有更多数据可供获取，跳出循环
 		pRow = result->Fetch();//继续获取下一行数据，直到没有更多数据可供获取
 		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	}
