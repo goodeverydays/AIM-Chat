@@ -101,6 +101,17 @@ namespace BR {
 		}
 		uint32_t Size() { return m_index; }
 		string toString()const { return m_buffer; }
+		string toSendString()const
+		{
+			string out = m_buffer;
+			BinaryWriter writer;
+			int len = (int)out.size();
+			writer.WriteData(len + 6);
+			writer.WriteData(htonl(len));
+			writer.WriteData(htonl(0));
+			out = writer.toString() + out;
+			return out;
+		}
 		void Clear() { m_buffer.clear(); m_index = 0; }
 
 	protected:

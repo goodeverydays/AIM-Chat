@@ -8,11 +8,14 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <iostream>
 #include "BinaryReader.h"
+#include "UserManager.h"
+#include "MsgCacheManager.h"
 
 using namespace muduo;
 using namespace muduo::net;
 using namespace boost::uuids;
 using namespace std::placeholders;
+using namespace BR;
 
 enum {
 	msg_type_unknown,
@@ -40,7 +43,7 @@ public:
 	~TcpSession() = default;
 	void Send(const TcpConnectionPtr& conn, BR::BinaryWriter& writer)
 	{
-		string out = writer.toString();
+		string out = writer.toSendString();
 		if (conn != NULL)
 		{
 			conn->send(out.c_str(), out.size());
@@ -68,7 +71,7 @@ public:
 	bool Process(const TcpConnectionPtr& conn, string msgbuff);
 
 	int32_t UserID()const { return (m_user != NULL) ? m_user->userid : -1; }
-	void Send(BinarWriter& writer)
+	void Send(BR::BinaryWriter& writer)
 	{
 		if (m_conn == NULL)
 		{

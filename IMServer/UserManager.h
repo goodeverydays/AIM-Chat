@@ -35,6 +35,8 @@ public:
 	~User() = default;
 };
 
+typedef std::shared_ptr<User> UserPtr;
+
 class UserManager final
 {
 public:

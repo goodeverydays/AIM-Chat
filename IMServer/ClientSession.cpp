@@ -309,6 +309,149 @@ void ClientSession::OnGetFriendListResponse(const TcpConnectionPtr& conn, const 
 	root["userinfo"] = Json::Value(Json::arrayValue);
 	for (const auto& iter : lstFriends)
 	{
-
+		Json::Value f;
+		f["userid"] = iter->userid;
+		f["username"] = iter->username;
+		f["nickname"] = iter->nickname;
+		f["facetype"] = iter->facetype;
+		f["customface"] = iter->customface;
+		f["gender"] = iter->gender;
+		f["birthday"] = iter->birthday;
+		f["signature"] = iter->signature;
+		f["address"] = iter->address;
+		f["phonenumber"] = iter->phonenumber;
+		f["mail"] = iter->mail;
+		f["clienttype"] = 1; 
+		f["status"] = iter->status ? 1 : 0;
+		root["userinfo"].append(f);
 	}
+	BinaryWriter writer;
+	writer.WriteData(htonl(msg_type_getofriendlist));
+	writer.WriteData(htonl(m_seq));
+	writer.WriteData(root.toStyledString());
+	TcpSession::Send(conn, writer);
+	printf("%s(%d) : %s\r\n", __FILE__, __LINE__, __FUNCTION__);
+}
+
+void ClientSession::OnFindUserResponse(const TcpConnectionPtr& conn, const string& data)
+{
+	Json::Value root, result;
+	Json::Reader reader;
+}
+
+void ClientSession::OnOperateFriendResponse(const TcpConnectionPtr& conn, const string& data)
+{
+}
+
+void ClientSession::OnUpdateUserInfoResponse(const TcpConnectionPtr& conn, const string& data)
+{
+}
+
+void ClientSession::OnModifyPasswordResponse(const TcpConnectionPtr& conn, const string& data)
+{
+}
+
+void ClientSession::OnCreateGroupResponse(const TcpConnectionPtr& conn, const string& data)
+{
+}
+
+void ClientSession::OnGetGroupMembersResponse(const TcpConnectionPtr& conn, const string& data)
+{
+}
+
+void ClientSession::OnChatResponse(const TcpConnectionPtr& conn, const string& data)
+{
+	BinaryWriter writer;
+	writer.WriteData(htonl(msg_type_chat));
+	writer.WriteData(htonl(m_seq));
+	writer.WriteData(data);
+	//消息发送者
+	writer.WriteData(m_user->userid);
+	//消息接收者
+	writer.WriteData(m_target);
+	printf("%s(%d): %s target:%d cur:%dr\r\n",
+		__FILE__, __LINE__, __FUNCTION__, m_target, m_user->userid);
+	cout << data << endl;
+	UserManager& userMgr = Singleton<UserManager>::instance();
+	//写入消息记录
+	if (!userMgr.SaveChatMsgToDb(m_user->userid, m_target, data))
+	{
+		LOG_ERROR << "Write chat msg to db error, senderid = " << m_user->userid << ", targetid = " << m_target << ", chatmsg:" << data;;
+	}
+
+	IMServer& imserver = Singleton<IMSer>::instance();
+	MsgCacheManager& msgCacheMgr = Singleton<MsgCacheManager>:::instance();
+	//单聊消息
+	if (m_target < GROUPID_BOUBDARY)
+	{
+		//先看目标用户是否在线
+		ClientSessionPtr targetSession = imserver.GetSessionByID(m_target);
+		//目标用户不在线， 缓存这个消息
+		if (!targetSession)
+		{
+			msgCacheMgr.AddChatMsgCache(m_target, writer.toString());
+			return;
+		}
+
+		targetSession->Send(writer);
+		return;
+	}
+
+	//群聊消息
+	std::list<UserPtr> friends;//群成员
+	userMgr.GetFriendInfoByUserId(m_target, friends);
+	std::string strUserInfo;
+	bool userOnline = false;
+	for (const auto& iter : friends)
+	{
+		//先看目标用户是否在线
+		ClienSessionPtr targetSession = imserver.GetSessionByID(iter->userid);
+		//目标用户不在线， 缓存这个消息
+		if (!targetSession)
+		{
+			msgCacheMgr.AddChatMsgCache(iter->userid, writer.toString());
+			continue;
+		}
+		targetSession->Send(writer);
+	}
+	printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
+}
+
+//群发业务处理
+void ClientSession::OnMultiChatResponse(const TcpConnectionPtr& conn, const string& data)
+{
+	Json::Reader reader;
+	Json::Value root;
+	if (!reader.parse(m_targets, root))
+	{
+		LOG_ERROR << "invalid json: targets: " << m_targets << "data: " << data << ", userid" << m_user->userid << ", client: " <<
+			conn.peerAddress().toIpPort();
+		return;
+	}
+	if (!root["targets"].isArray())
+	{
+		LOG_ERROR << "invalid json: targets: " << m_targets << "data: " << data << ", userid" << m_user->userid << ", client: " <<
+			conn.peerAddress().toIpPort();
+		return;
+	}
+	for (uint32_t i = 0; i < root["targets"].size(); ++i)
+	{
+		m_target = root["targets"][i].asInt();
+		OnChatResponse(conn, data);
+	}
+	printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
+	LOG_INFO << "Send to client: cmd=msg_type_multichat, targets: " << m_targets << "data: " << data << ", userid : " <<
+		m_user->userid << ", client : " << conn->peerAddress().tolpPort();
+}
+
+void ClientSession::DeleteFriend(const TcpConnectionPtr& conn, const string& data)
+{
+}
+
+void ClientSession::OnAddGroupResponse(const TcpConnectionPtr& conn, const string& data)
+{
+}
+
+void ClientSession::SendUserStatusChangeMsg(const TcpConnectionPtr& conn, const string& data)
+{
 }

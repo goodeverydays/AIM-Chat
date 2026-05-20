@@ -68,6 +68,7 @@ mysqltool.cpp
 Field.cpp
 QueryResult.cpp
 MySqlManager.cpp
+
 )
 
 set(chat_srcs  
@@ -76,6 +77,7 @@ IMSer.cpp
 ClientSession.cpp
 UserManager.cpp
 BinaryReader.cpp
+MsgCacheManager.cpp
 )
 
 set(file_srcs 
