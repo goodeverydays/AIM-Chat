@@ -1,7 +1,13 @@
-﻿#include "mysqltool.h"
-#include <map>
+﻿#pragma once
 
-class MySqlManager 
+#include "mysqltool.h"
+#include <map>
+#include <string>
+#include <memory>
+
+using namespace std;
+
+class MySqlManager
 {
 public:
 	typedef struct fieldinfo{//字段信息
@@ -26,10 +32,10 @@ public:
 	MySqlManager();
 	~MySqlManager();
 	bool Init(
-		const string& host, 
-		const string user, 
-		const string passwd, 
-		const string dbname, 
+		const string& host,
+		const string user,
+		const string passwd,
+		const string dbname,
 		unsigned port = 3306
 	);
 
@@ -37,7 +43,7 @@ public:
 	//执行SQL查询语句，返回查询结果的智能指针，方便管理查询结果的生命周期，确保在程序结束时自动释放资源，避免内存泄漏
 	bool Execute(const string& sql);
 	//执行SQL语句，返回执行结果的布尔值，表示执行是否成功，可以根据需要进行错误处理和日志记录等操作
-	
+
 private:
 	bool CheckDatabase();
 	bool CheckTable(const sTableInfo& info);

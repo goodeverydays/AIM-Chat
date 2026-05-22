@@ -1,6 +1,4 @@
 ﻿#include "mysqltool.h"
-extern void mysql_close(MYSQL* sock);
-//声明mysql_close函数，使用STDCALL调用约定，参数为MYSQL指针类型的sock
 
 MySQLTool::MySQLTool()
 {
@@ -58,7 +56,7 @@ QueryResultPtr MySQLTool::Query(const string& sql)
 	cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	if (ret)//如果执行SQL查询语句失败，返回一个空的智能指针，表示查询失败
 	{
-		nErrno = mysql_errno(m_mysql);
+		uint32_t nErrno = mysql_errno(m_mysql);
 		cout << "mysql_real_query call failed! code is " << nErrno << endl;
 		if (CR_SERVER_GONE_ERROR == nErrno)
 		{

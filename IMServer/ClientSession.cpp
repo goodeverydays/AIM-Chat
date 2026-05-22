@@ -272,7 +272,7 @@ void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& 
 	Singleton<MsgCacheManager>::instance().GetNotifyMsgCache(m_user->userid, listNotifyCache);
 	for (const auto& iter : listNotifyCache)
 	{
-		writer = iter.notifymsg;
+		writer.UpdateBuffer(iter.notifymsg);
 		TcpSession::Send(conn, writer);
 	}
 	//推送聊天消息
@@ -280,7 +280,7 @@ void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& 
 	Singleton<MsgCacheManager>::instance().GetChatMsgCache(m_user->userid, listChatCache);
 	for (const auto& iter : listChatCache)
 	{
-		writer = iter.chatmsg;
+		writer.UpdateBuffer(iter.chatmsg);
 		TcpSession::Send(conn, writer);
 	}
 
@@ -426,13 +426,13 @@ void ClientSession::OnMultiChatResponse(const TcpConnectionPtr& conn, const stri
 	if (!reader.parse(m_targets, root))
 	{
 		LOG_ERROR << "invalid json: targets: " << m_targets << "data: " << data << ", userid" << m_user->userid << ", client: " <<
-			conn.peerAddress().toIpPort();
+			conn->peerAddress().toIpPort();
 		return;
 	}
 	if (!root["targets"].isArray())
 	{
 		LOG_ERROR << "invalid json: targets: " << m_targets << "data: " << data << ", userid" << m_user->userid << ", client: " <<
-			conn.peerAddress().toIpPort();
+			conn->peerAddress().toIpPort();
 		return;
 	}
 	for (uint32_t i = 0; i < root["targets"].size(); ++i)

@@ -17,7 +17,7 @@ bool UserManager::init()
 	//加载用户关系（好友关系）
 	for (auto& iter : m_cachedUsers)
 	{
-		if (!LoadRelationshipFromDB(iter.userid, iter.friends))
+		if (!LoadRelationshipFromDB(iter->userid, iter->friends))
 		{
 			cout << "load friend failed!\r\n";
 		}
@@ -47,7 +47,7 @@ bool UserManager::AddUser(User& user)
 	user.ownerid = 0;//设置用户的默认群主ID，可以根据需要进行修改，例如设置为一个特定的值来表示没有群主或者其他情况
 	{
 		lock_guard<mutex> guard(m_mutex);//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
-		m_cachedUsers.push_back(user);//将用户对象添加到缓存用户信息的列表中，方便后续进行遍历和管理
+		m_cachedUsers.push_back(std::make_shared<User>(user));//将用户对象拷贝到堆上并添加到缓存列表中
 	}
 	return true;
 }
@@ -83,7 +83,7 @@ bool UserManager::LoadUserFromDB()
 		u.mail = pRow[11].GetString();
 		{
 			lock_guard<mutex> guard(m_mutex);//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
-			m_cachedUsers.push_back(u);
+			m_cachedUsers.push_back(std::make_shared<User>(u));
 			{
 				lock_guard<mutex> guard(m_mutex);
 				m_mapUsers[u.userid] = make_shared<User>(u);
@@ -129,12 +129,12 @@ bool UserManager::LoadRelationshipFromDB(int32_t userid, set<int32_t>& friends)
 	return true;
 }
 
-bool UserManager::GetUserInfoUsername(const string& name, User& user)
+bool UserManager::GetUserInfoUsername(const string& name, UserPtr& user)
 {
 	lock_guard<mutex> guard(m_mutex);//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
 	for (const auto& iter : m_cachedUsers)
 	{
-		if (iter.username == name)//遍历缓存用户信息的列表，查找与给定用户名匹配的用户对象，如果找到，则将其赋值给参数user，并返回true
+		if (iter->username == name)//遍历缓存用户信息的列表，查找与给定用户名匹配的用户对象，如果找到，则将其赋值给参数user，并返回true
 		{
 			user = iter;
 			return true;
@@ -150,7 +150,7 @@ bool UserManager::GetFriendInfoByUserID(int32_t userid, list<UserPtr>& friends)
 
 UserPtr UserManager::GetUserByID(int32_t userid)
 {
-	lock_guar<mutex> guard(m_mutex);
+	lock_guard<mutex> guard(m_mutex);
 	iterMapUser iter = m_mapUsers.find(userid);//在用户ID到用户对象的映射中查找与给定用户ID匹配的用户对象，如果找到，则返回其对应的智能指针，否则返回空指针
 	if (iter == m_mapUsers.end()) return UserPtr();
 	return iter->second;
@@ -177,4 +177,34 @@ bool UserManager::MakeFriendRelationship(int32_t smallid, int32_t greatid)
 	if (it == m_mapUsers.end()) return false;
 	it->second->friends.insert(smallid);
 	return true;
+}
+
+bool UserManager::ReleaseFriendRelationship(int32_t smallid, int32_t greatid)
+{
+	return false;
+}
+
+bool UserManager::UpdateUserInfo(int32_t userid, const User& newuserinfo)
+{
+	return false;
+}
+
+bool UserManager::ModifyUserPassword(int32_t userid, const string& newpassword)
+{
+	return false;
+}
+
+bool UserManager::AddGroup(const char* groupname, int32_t ownerid, int32_t& groupid)
+{
+	return false;
+}
+
+bool UserManager::SaveChatMsgToDb(int32_t senderid, int32_t targetid, const string& chatmsg)
+{
+	return false;
+}
+
+bool UserManager::DeleteFriendToUser(int32_t userid, int32_t friendid)
+{
+	return false;
 }

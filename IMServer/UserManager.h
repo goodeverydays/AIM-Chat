@@ -9,6 +9,8 @@
 #include <set>
 #include <list>
 #include <mutex>
+#include<memory>
+#include<map>
 
 using namespace std;
 
@@ -66,11 +68,11 @@ public:
 private:
 	mutex m_mutex;//互斥锁对象，用于保护对用户信息的访问和修改，确保线程安全，避免数据竞争和不一致的问题
 	list<UserPtr> m_cachedUsers;//缓存用户信息的列表，可以使用list容器来存储用户对象，方便进行遍历和管理
-	map<int32_t, UserPtr> m_mapUsers;//用户ID与用户对象的映射关系，可以使用map容器来存储用户ID和用户对象的对应关系，方便根据用户ID快速查找用户信息
+	std::map<int32_t, UserPtr> m_mapUsers;//用户ID与用户对象的映射关系，可以使用map容器来存储用户ID和用户对象的对应关系，方便根据用户ID快速查找用户信息
 	int32_t m_baseUserID{ 0 };//用于生成新的用户ID的基数，可以根据需要进行自增或者其他操作来确保每个用户都有一个唯一的ID
 	int32_t m_baseGroupID{ 0xFFFFFFF };//用于生成新的群ID的基数，可以根据需要进行自增或者其他操作来确保每个群都有一个唯一的ID
 	
 };
 
-typedef map<int32_t, UserPtr>::iterator iterMapUser;
+typedef std::map<int32_t, UserPtr>::iterator iterMapUser;
 typedef set<int32_t>::iterator iterSetUserID;

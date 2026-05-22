@@ -3,6 +3,7 @@
 #include <string>
 #include <string.h>
 #include <cstdint>
+#include <arpa/inet.h>
 
 using namespace std;
 namespace BR {
@@ -113,6 +114,11 @@ namespace BR {
 			return out;
 		}
 		void Clear() {  m_index = 0; m_buffer.clear(); }
+		void UpdateBuffer(const string& buffer)//从已有缓冲区加载数据，用于从缓存中还原消息
+		{
+			m_buffer = buffer;
+			m_index = m_buffer.size();
+		}
 
 	protected:
 		void Compress(size_t len, string& out) //压缩算法函数，接受一个长度参数和一个输出字符串参数，用于将数据进行压缩并存储在输出字符串中，假设压缩算法已经实现，并且可以根据长度参数对数据进行压缩

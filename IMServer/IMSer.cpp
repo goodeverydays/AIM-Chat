@@ -1,4 +1,5 @@
 ﻿#include "IMSer.h"
+#include "ClientSession.h"
 #include <sstream>
 
 using namespace std::placeholders;
@@ -51,7 +52,7 @@ void IMSer::OnClose(const TcpConnectionPtr& conn)
 	}
 }
 
-ClientSessionPtr IMSer::GetSessionByID(int32_t userid)
+std::shared_ptr<ClientSession> IMSer::GetSessionByID(int32_t userid)
 {
 	std::lock_guard<std::mutex> guard(m_sessionlock);
 	for (const auto& pair : m_mapclient)
