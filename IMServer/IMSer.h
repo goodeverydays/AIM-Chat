@@ -1,4 +1,5 @@
-﻿#include "net/EventLoop.h"
+
+#include "net/EventLoop.h"
 #include "net/EventLoopThreadPool.h"
 #include "net/EventLoopThread.h"
 #include "net/TcpServer.h"
@@ -19,6 +20,7 @@ public:
 	IMSer& operator=(const IMSer&) = delete;
 	~IMSer() = default;
 	bool init(const std::string& ip, short port, EventLoop* loop);
+	ClientSessionPtr GetSessionByID(int32_t userid);//根据用户ID查找对应的会话
 
 protected:
 	void OnConnection(const TcpConnectionPtr& conn);

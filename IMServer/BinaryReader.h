@@ -105,14 +105,14 @@ namespace BR {
 		{
 			string out = m_buffer;
 			BinaryWriter writer;
-			int len = (int)out.size();
+			int len = (int)out.size();//获取包长度
 			writer.WriteData(len + 6);
 			writer.WriteData(htonl(len));
-			writer.WriteData(htonl(0));
+			writer.WriteData(htons(0));//数据和校验
 			out = writer.toString() + out;
 			return out;
 		}
-		void Clear() { m_buffer.clear(); m_index = 0; }
+		void Clear() {  m_index = 0; m_buffer.clear(); }
 
 	protected:
 		void Compress(size_t len, string& out) //压缩算法函数，接受一个长度参数和一个输出字符串参数，用于将数据进行压缩并存储在输出字符串中，假设压缩算法已经实现，并且可以根据长度参数对数据进行压缩

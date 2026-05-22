@@ -58,7 +58,7 @@ QueryResultPtr MySQLTool::Query(const string& sql)
 	cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 	if (ret)//如果执行SQL查询语句失败，返回一个空的智能指针，表示查询失败
 	{
-		uint32_t nErrno = mysql_errno(m_mysql);
+		nErrno = mysql_errno(m_mysql);
 		cout << "mysql_real_query call failed! code is " << nErrno << endl;
 		if (CR_SERVER_GONE_ERROR == nErrno)
 		{
@@ -113,7 +113,7 @@ bool MySQLTool::Execute(const string& sql, uint32_t& nAffectedCount, int& nErrno
 	int ret = mysql_query(m_mysql, sql.c_str());
 	if (ret)
 	{
-		uint32_t nErrno = mysql_errno(m_mysql);
+		nErrno = mysql_errno(m_mysql);
 		cout << "mysql_query call failed! code is " << nErrno << endl;
 		cout << "mysql_query call failed! msg : " << mysql_error(m_mysql) << endl;
 		if (CR_SERVER_GONE_ERROR == nErrno)
@@ -133,10 +133,10 @@ bool MySQLTool::Execute(const string& sql, uint32_t& nAffectedCount, int& nErrno
 		else {
 			return false;
 		}
-		nErrno = 0;
-		nAffectedCount = mysql_affected_rows(m_mysql);
 	}
 	
+	nErrno = 0;
+	nAffectedCount = mysql_affected_rows(m_mysql);
 	return true;
 }
 

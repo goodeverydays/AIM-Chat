@@ -84,6 +84,10 @@ bool UserManager::LoadUserFromDB()
 		{
 			lock_guard<mutex> guard(m_mutex);//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
 			m_cachedUsers.push_back(u);
+			{
+				lock_guard<mutex> guard(m_mutex);
+				m_mapUsers[u.userid] = make_shared<User>(u);
+			}
 		}
 		if(u.userid > m_baseUserID)
 		{
@@ -137,4 +141,40 @@ bool UserManager::GetUserInfoUsername(const string& name, User& user)
 		}
 	}
 	return false;//如果没有找到匹配的用户对象，则返回false
+}
+
+bool UserManager::GetFriendInfoByUserID(int32_t userid, list<UserPtr>& friends)
+{
+	return false;
+}
+
+UserPtr UserManager::GetUserByID(int32_t userid)
+{
+	lock_guar<mutex> guard(m_mutex);
+	iterMapUser iter = m_mapUsers.find(userid);//在用户ID到用户对象的映射中查找与给定用户ID匹配的用户对象，如果找到，则返回其对应的智能指针，否则返回空指针
+	if (iter == m_mapUsers.end()) return UserPtr();
+	return iter->second;
+	return UserPtr();
+}
+
+bool UserManager::MakeFriendRelationship(int32_t smallid, int32_t greatid)
+{
+	if (smallid >= greatid) return false;//判断小ID是否大于等于大ID，如果是，则返回false，表示无法建立好友关系，因为小ID应该小于大ID
+	stringstream sql;
+	sql << "INSERT INTO t_user_relationship(f_user_id1, f_user_id2) VALUES(" <<
+		smallid << ", " << greatid << ")";//构造SQL插入语句，将好友关系信息插入到数据库中，假设t_user_relationship表已经存在，并且包含相应的字段
+	if (!Singleton<MySqlManager>::instance().Execute(sql.str()))
+	{
+		return false;
+	}
+	//修改缓存中的好友关系
+	lock_guard<mutex> guard(m_mutex);
+	//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
+	iterMapUser it = m_mapUsers.find(smallid);//在用户ID到用户对象的映射中查找与小ID匹配的用户对象，如果找到，则将大ID插入到其好友列表中
+	if (it == m_mapUsers.end()) return false;
+	it->second->friends.insert(greatid);
+	it = m_mapUsers.find(greatid);//在用户ID到用户对象的映射
+	if (it == m_mapUsers.end()) return false;
+	it->second->friends.insert(smallid);
+	return true;
 }

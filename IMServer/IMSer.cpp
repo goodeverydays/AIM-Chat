@@ -50,3 +50,14 @@ void IMSer::OnClose(const TcpConnectionPtr& conn)
 		std::cout << conn->name() << std::endl;
 	}
 }
+
+ClientSessionPtr IMSer::GetSessionByID(int32_t userid)
+{
+	std::lock_guard<std::mutex> guard(m_sessionlock);
+	for (const auto& pair : m_mapclient)
+	{
+		if (pair.second->UserID() == userid)
+			return pair.second;
+	}
+	return ClientSessionPtr();
+}

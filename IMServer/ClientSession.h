@@ -1,4 +1,5 @@
-﻿#include "net/EventLoop.h"
+﻿#pragma once
+#include "net/EventLoop.h"
 #include "net/EventLoopThreadPool.h"
 #include "net/EventLoopThread.h"
 #include "net/TcpServer.h"
@@ -10,12 +11,15 @@
 #include "BinaryReader.h"
 #include "UserManager.h"
 #include "MsgCacheManager.h"
+#include "IMSer.h"
 
 using namespace muduo;
 using namespace muduo::net;
 using namespace boost::uuids;
 using namespace std::placeholders;
 using namespace BR;
+
+#define GROUPID_BOUNDARY 0xFFFFFFF  // 群ID与用户ID的分界线，大于等于此值的为群ID
 
 enum {
 	msg_type_unknown,
@@ -96,9 +100,9 @@ protected:
 	void OnChatResponse(const TcpConnectionPtr& conn, const string& data);//处理聊天响应消息的函数，接收客户端发送的聊天请求消息，并进行相应的处理，例如转发聊天消息、保存聊天记录等
 	void OnMultiChatResponse(const TcpConnectionPtr& conn, const string& data);//处理单发响应消息的函数，接收客户端发送的单发请求消息，并进行相应的处理，例如转发单发消息、保存聊天记录等
 
-	void DeleteFriend(const TcpConnectionPtr& conn, const string& data);//删除好友
-	void OnAddGroupResponse(const TcpConnectionPtr& conn, const string& data);//添加群成员
-	void SendUserStatusChangeMsg(const TcpConnectionPtr& conn, const string& data);//发送用户状态变化消息，通知好友用户的状态发生了变化，例如上线、离线等
+	void DeleteFriend(const TcpConnectionPtr& conn, int32_t friendid);//删除好友
+	void OnAddGroupResponse(const TcpConnectionPtr& conn, int32_t groupid);//添加群成员
+	void SendUserStatusChangeMsg(int32_t userid, int type);//发送用户状态变化消息，通知好友用户的状态发生了变化，例如上线、离线等
 private:
 	std::string m_sessionid;
 	int m_seq;//会话的序号

@@ -21,6 +21,7 @@ ClientSession::ClientSession(const TcpConnectionPtr& conn)
 	// 因此使用const_cast将其转换为std::string*类型的指针，然后通过解引用操作符*将其赋值为m_sessionid。这样做是为了在不修改TcpConnection类的定义的情况下，
 	// 给每个连接分配一个唯一的会话ID，并且能够通过连接对象的名称来访问这个会话ID。
 	(*client)->setMessageCallback(std::bind(&ClientSession::OnRead, this, _1, _2, std::placeholders::_3));//设置连接对象的消息回调函数，当服务器接收到消息时会调用ClientSession类的OnRead成员函数进行处理
+		m_conn = conn;//保存连接对象的引用，后续发送消息时使用
 	
 }
 
@@ -43,7 +44,7 @@ void ClientSession::OnRead(const TcpConnectionPtr& conn, Buffer* buf, Timestamp 
 
 		buf->retrieve(sizeof(int32_t));//从缓冲区中移除已经读取的消息长度
 		string msgbuff;
-		msgbuff.assign(buf->peek()+6, packagesize-6);//从缓冲区中读取消息内容，假设消息内容紧跟在消息长度之后，长度为packagesize
+		msgbuff.assign(buf->peek(), packagesize);//从缓冲区中读取消息内容
 		BinaryReader::dump(msgbuff);//调用BinaryReader类的dump函数将消息内容以十六进制格式输出到控制台，假设消息内容存储在缓冲区中，长度为packagesize
 
 		buf->retrieve(packagesize);//从缓冲区中移除已经读取的消息内容
@@ -52,6 +53,7 @@ void ClientSession::OnRead(const TcpConnectionPtr& conn, Buffer* buf, Timestamp 
 		{
 			cout << "process error, close connection!\r\n";
 			conn->forceClose();//如果处理失败，则强制关闭连接，断开与客户端的通信
+				return;//处理失败后退出循环，不再继续处理后续缓冲区数据
 		}
 	}
 
@@ -148,7 +150,7 @@ void ClientSession::OnRegisterResponse(const TcpConnectionPtr& conn, const strin
 	{
 		cout << "error json: " << data << "\r\n";
 		response["code"] = 101;
-		response["message"] = "json parse failed!";
+		response["msg"] = "json parse failed!";
 		result = response.toStyledString();
 		writer.WriteData(result);
 		TcpSession::Send(conn, writer);
@@ -158,7 +160,7 @@ void ClientSession::OnRegisterResponse(const TcpConnectionPtr& conn, const strin
 	{
 		cout << "error type:" << data << "\r\n";
 		response["code"] = 102;
-		response["message"] = "json data type failed!";
+		response["msg"] = "json data type failed!";
 		result = response.toStyledString();
 		writer.WriteData(result);
 		TcpSession::Send(conn, writer);
@@ -204,8 +206,8 @@ void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& 
 	{
 		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 		response["code"] = 101;
-		response["message"] = "json parse failed!";
-		result = root.toStyledString();
+		response["msg"] = "json parse failed!";
+		result = response.toStyledString();
 		writer.WriteData(result);
 		TcpSession::Send(conn, writer);
 		return;
@@ -216,7 +218,7 @@ void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& 
 	{
 		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 		response["code"] = 102;
-		response["message"] = "json data type failed!";
+		response["msg"] = "json data type failed!";
 		result = response.toStyledString();
 		writer.WriteData(result);
 		TcpSession::Send(conn, writer);
@@ -224,19 +226,18 @@ void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& 
 	}
 	string username = root["username"].asString();
 	string password = root["password"].asString();
-	User user;
-	if (Singleton<UserManager>::instance().GetUserInfoUsername(username, user) == false)
+	if (Singleton<UserManager>::instance().GetUserInfoUsername(username, m_user) == false)
 	{
 		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 		response["code"] = 103;
-		response["message"] = "user is not exist or password is incorrect!";
+		response["msg"] = "user is not exist or password is incorrect!";
 		result = response.toStyledString();
 		writer.WriteData(result);
 		TcpSession::Send(conn, writer);
 		return;
 	}
 	
-	if (password != user.password)
+	if (password != m_user->password)
 	{
 		cout << __FILE__ << "(" << __LINE__ << ")\r\n";
 		response["code"] = 104;
@@ -245,8 +246,8 @@ void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& 
 		writer.WriteData(result);
 		TcpSession::Send(conn, writer);
 		return;
-	}
 
+	}
 
 	//如果成功返回应答
 	response["code"] = 0;
@@ -285,8 +286,8 @@ void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& 
 
 	//给其他用户推送上线信息
 	list<UserPtr> friends;
-	Singleton<UserManager>::instance().GetFriendInfoByUserId(m_user->userid, friends);
-	IMServer& imserver = Singleton<IMSer>::instance();
+	Singleton<UserManager>::instance().GetFriendInfoByUserID(m_user->userid, friends);
+	IMSer& imserver = Singleton<IMSer>::instance();
 	for (const auto& iter : friends)
 	{
 		ClientSessionPtr targetSession = imserver.GetSessionByID(iter->userid);
@@ -302,12 +303,12 @@ void ClientSession::OnLoginResponse(const TcpConnectionPtr& conn, const string& 
 void ClientSession::OnGetFriendListResponse(const TcpConnectionPtr& conn, const string& data)
 {
 	std::list<UserPtr> lstFriend;
-	Singleton<UserManager>::instance().GetFriendInfoByUserID(m_user->userid, lstFriends);
+	Singleton<UserManager>::instance().GetFriendInfoByUserID(m_user->userid, lstFriend);
 	Json::Value root;
 	root["code"] = 0;
 	root["msg"] = "ok";
 	root["userinfo"] = Json::Value(Json::arrayValue);
-	for (const auto& iter : lstFriends)
+	for (const auto& iter : lstFriend)
 	{
 		Json::Value f;
 		f["userid"] = iter->userid;
@@ -379,10 +380,10 @@ void ClientSession::OnChatResponse(const TcpConnectionPtr& conn, const string& d
 		LOG_ERROR << "Write chat msg to db error, senderid = " << m_user->userid << ", targetid = " << m_target << ", chatmsg:" << data;;
 	}
 
-	IMServer& imserver = Singleton<IMSer>::instance();
-	MsgCacheManager& msgCacheMgr = Singleton<MsgCacheManager>:::instance();
+	IMSer& imserver = Singleton<IMSer>::instance();
+	MsgCacheManager& msgCacheMgr = Singleton<MsgCacheManager>::instance();
 	//单聊消息
-	if (m_target < GROUPID_BOUBDARY)
+	if (m_target < GROUPID_BOUNDARY)
 	{
 		//先看目标用户是否在线
 		ClientSessionPtr targetSession = imserver.GetSessionByID(m_target);
@@ -399,13 +400,13 @@ void ClientSession::OnChatResponse(const TcpConnectionPtr& conn, const string& d
 
 	//群聊消息
 	std::list<UserPtr> friends;//群成员
-	userMgr.GetFriendInfoByUserId(m_target, friends);
+	userMgr.GetFriendInfoByUserID(m_target, friends);
 	std::string strUserInfo;
 	bool userOnline = false;
 	for (const auto& iter : friends)
 	{
 		//先看目标用户是否在线
-		ClienSessionPtr targetSession = imserver.GetSessionByID(iter->userid);
+		ClientSessionPtr targetSession = imserver.GetSessionByID(iter->userid);
 		//目标用户不在线， 缓存这个消息
 		if (!targetSession)
 		{
@@ -441,17 +442,17 @@ void ClientSession::OnMultiChatResponse(const TcpConnectionPtr& conn, const stri
 	}
 	printf("%s(%d):%s\r\n", __FILE__, __LINE__, __FUNCTION__);
 	LOG_INFO << "Send to client: cmd=msg_type_multichat, targets: " << m_targets << "data: " << data << ", userid : " <<
-		m_user->userid << ", client : " << conn->peerAddress().tolpPort();
+		m_user->userid << ", client : " << conn->peerAddress().toIpPort();
 }
 
-void ClientSession::DeleteFriend(const TcpConnectionPtr& conn, const string& data)
+void ClientSession::DeleteFriend(const TcpConnectionPtr& conn, int32_t friendid)
 {
 }
 
-void ClientSession::OnAddGroupResponse(const TcpConnectionPtr& conn, const string& data)
+void ClientSession::OnAddGroupResponse(const TcpConnectionPtr& conn, int32_t groupid)
 {
 }
 
-void ClientSession::SendUserStatusChangeMsg(const TcpConnectionPtr& conn, const string& data)
+void ClientSession::SendUserStatusChangeMsg(int32_t userid, int type)
 {
 }

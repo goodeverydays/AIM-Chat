@@ -193,9 +193,9 @@ bool MySqlManager::CheckTable(const sTableInfo& info)
 			pRow = result->Fetch();
 			continue;
 		}
-		cout << __FILE__ << "(" << __LINE__ << "): " << iter->second.sDesc<< "\r\n";
+		cout << __FILE__ << "(" << __LINE__ << "): " << iter->second.sType<< "\r\n";
 		rest.erase(name);//如果表结构信息中找到了匹配的字段名称，说明该字段存在，从rest映射表中删除该字段信息，表示该字段已经匹配成功
-		if (iter->second.sDesc != type)
+		if (iter->second.sType != type)
 		{
 			mapChange.insert(FieldPair(name, iter->second));//如果表结构信息中的字段类型与查询结果中的字段类型不匹配，说明该字段需要更新，将字段名称和字段信息插入到mapChange映射表中，方便后续更新字段
 		}

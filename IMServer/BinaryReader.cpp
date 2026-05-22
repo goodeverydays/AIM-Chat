@@ -27,7 +27,7 @@ namespace BR {
 		m_index += out.size();
 		if (data.size() > 0) {
 			m_buffer.append(data.c_str(), data.size());
-			m_buffer += data.size();
+			m_index += data.size();
 		}
 		return true;
 	}
