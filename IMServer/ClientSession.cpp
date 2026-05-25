@@ -336,28 +336,375 @@ void ClientSession::OnGetFriendListResponse(const TcpConnectionPtr& conn, const 
 
 void ClientSession::OnFindUserResponse(const TcpConnectionPtr& conn, const string& data)
 {
-	Json::Value root, result;
+	Json::Value root, response;
 	Json::Reader reader;
+	BinaryWriter writer;
+	string result;
+	int cmd = msg_type_finduser;
+	writer.WriteData(htonl(cmd));
+	writer.WriteData(htonl(m_seq));
+
+	if (!reader.parse(data, root))
+	{
+		response["code"] = 101;
+		response["msg"] = "json parse failed!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		TcpSession::Send(conn, writer);
+		return;
+	}
+	//根据查找类型（用户名或用户ID）查找用户
+	UserPtr user;
+	if (root["type"].asString() == "username")
+	{
+		string keyword = root["keyword"].asString();
+		Singleton<UserManager>::instance().GetUserInfoUsername(keyword, user);
+	}
+	else if (root["type"].asString() == "userid")
+	{
+		int32_t userid = root["keyword"].asInt();
+		user = Singleton<UserManager>::instance().GetUserByID(userid);
+	}
+
+	if (!user)
+	{
+		response["code"] = 103;
+		response["msg"] = "user not found!";
+	}
+	else
+	{
+		response["code"] = 0;
+		response["msg"] = "ok";
+		response["userid"] = user->userid;
+		response["username"] = user->username;
+		response["nickname"] = user->nickname;
+		response["facetype"] = user->facetype;
+		response["customface"] = user->customface;
+		response["gender"] = user->gender;
+		response["birthday"] = user->birthday;
+		response["signature"] = user->signature;
+		response["address"] = user->address;
+		response["phonenumber"] = user->phonenumber;
+		response["mail"] = user->mail;
+		response["status"] = user->status;
+	}
+	result = response.toStyledString();
+	writer.WriteData(result);
+	TcpSession::Send(conn, writer);
+	printf("%s(%d): %s\r\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 void ClientSession::OnOperateFriendResponse(const TcpConnectionPtr& conn, const string& data)
 {
+	BinaryWriter writer;
+	string result;
+	Json::Reader reader;
+	Json::Value root, response;
+	int cmd = msg_type_operatefriend;
+	writer.WriteData(htonl(cmd));
+	writer.WriteData(htonl(m_seq));
+
+	if (!reader.parse(data, root))
+	{
+		response["code"] = 101;
+		response["msg"] = "json parse failed!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		TcpSession::Send(conn, writer);
+		return;
+	}
+
+	if (!root["type"].isInt() || !root["friendid"].isInt())
+	{
+		response["code"] = 102;
+		response["msg"] = "invalid parameter!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		TcpSession::Send(conn, writer);
+		return;
+	}
+
+	int operType = root["type"].asInt();
+	int32_t friendid = root["friendid"].asInt();
+	UserManager& userMgr = Singleton<UserManager>::instance();
+
+	if (operType == 1)  //添加好友
+	{
+		int32_t smallid = (m_user->userid < friendid) ? m_user->userid : friendid;
+		int32_t greatid = (m_user->userid < friendid) ? friendid : m_user->userid;
+		if (userMgr.MakeFriendRelationship(smallid, greatid))
+		{
+			response["code"] = 0;
+			response["msg"] = "ok";
+		}
+		else
+		{
+			response["code"] = 100;
+			response["msg"] = "add friend failed!";
+		}
+	}
+	else if (operType == 2)  //删除好友
+	{
+		if (userMgr.DeleteFriendToUser(m_user->userid, friendid))
+		{
+			response["code"] = 0;
+			response["msg"] = "ok";
+			//通知对方被删除好友
+			DeleteFriend(conn, friendid);
+		}
+		else
+		{
+			response["code"] = 100;
+			response["msg"] = "delete friend failed!";
+		}
+	}
+	else
+	{
+		response["code"] = 103;
+		response["msg"] = "unknown operation type!";
+	}
+
+	result = response.toStyledString();
+	writer.WriteData(result);
+	TcpSession::Send(conn, writer);
+	printf("%s(%d): %s\r\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 void ClientSession::OnUpdateUserInfoResponse(const TcpConnectionPtr& conn, const string& data)
 {
+	BinaryWriter writer;
+	string result;
+	Json::Reader reader;
+	Json::Value root, response;
+	int cmd = msg_type_updateuserinfo;
+	writer.WriteData(htonl(cmd));
+	writer.WriteData(htonl(m_seq));
+
+	if (!reader.parse(data, root))
+	{
+		response["code"] = 101;
+		response["msg"] = "json parse failed!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		TcpSession::Send(conn, writer);
+		return;
+	}
+	//构造新用户信息，未传的字段保留原值
+	User newinfo;
+	newinfo.nickname = root.isMember("nickname") ? root["nickname"].asString() : m_user->nickname;
+	newinfo.facetype = root.isMember("facetype") ? root["facetype"].asInt() : m_user->facetype;
+	newinfo.customface = root.isMember("customface") ? root["customface"].asString() : m_user->customface;
+	newinfo.gender = root.isMember("gender") ? root["gender"].asInt() : m_user->gender;
+	newinfo.birthday = root.isMember("birthday") ? root["birthday"].asInt() : m_user->birthday;
+	newinfo.signature = root.isMember("signature") ? root["signature"].asString() : m_user->signature;
+	newinfo.address = root.isMember("address") ? root["address"].asString() : m_user->address;
+	newinfo.phonenumber = root.isMember("phonenumber") ? root["phonenumber"].asString() : m_user->phonenumber;
+	newinfo.mail = root.isMember("mail") ? root["mail"].asString() : m_user->mail;
+
+	if (Singleton<UserManager>::instance().UpdateUserInfo(m_user->userid, newinfo))
+	{
+		//同步更新会话缓存中的用户信息
+		m_user->nickname = newinfo.nickname;
+		m_user->facetype = newinfo.facetype;
+		m_user->customface = newinfo.customface;
+		m_user->gender = newinfo.gender;
+		m_user->birthday = newinfo.birthday;
+		m_user->signature = newinfo.signature;
+		m_user->address = newinfo.address;
+		m_user->phonenumber = newinfo.phonenumber;
+		m_user->mail = newinfo.mail;
+
+		response["code"] = 0;
+		response["msg"] = "ok";
+	}
+	else
+	{
+		response["code"] = 100;
+		response["msg"] = "update user info failed!";
+	}
+
+	result = response.toStyledString();
+	writer.WriteData(result);
+	TcpSession::Send(conn, writer);
+	printf("%s(%d): %s\r\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 void ClientSession::OnModifyPasswordResponse(const TcpConnectionPtr& conn, const string& data)
 {
+	BinaryWriter writer;
+	string result;
+	Json::Reader reader;
+	Json::Value root, response;
+	int cmd = msg_type_modifypassword;
+	writer.WriteData(htonl(cmd));
+	writer.WriteData(htonl(m_seq));
+
+	if (!reader.parse(data, root))
+	{
+		response["code"] = 101;
+		response["msg"] = "json parse failed!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		TcpSession::Send(conn, writer);
+		return;
+	}
+
+	if (!root["oldpassword"].isString() || !root["newpassword"].isString())
+	{
+		response["code"] = 102;
+		response["msg"] = "invalid parameter!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		TcpSession::Send(conn, writer);
+		return;
+	}
+
+	string oldpassword = root["oldpassword"].asString();
+	string newpassword = root["newpassword"].asString();
+
+	if (oldpassword != m_user->password)
+	{
+		response["code"] = 103;
+		response["msg"] = "old password is incorrect!";
+	}
+	else if (Singleton<UserManager>::instance().ModifyUserPassword(m_user->userid, newpassword))
+	{
+		m_user->password = newpassword;
+		response["code"] = 0;
+		response["msg"] = "ok";
+	}
+	else
+	{
+		response["code"] = 100;
+		response["msg"] = "modify password failed!";
+	}
+
+	result = response.toStyledString();
+	writer.WriteData(result);
+	TcpSession::Send(conn, writer);
+	printf("%s(%d): %s\r\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 void ClientSession::OnCreateGroupResponse(const TcpConnectionPtr& conn, const string& data)
 {
+	BinaryWriter writer;
+	string result;
+	Json::Reader reader;
+	Json::Value root, response;
+	int cmd = msg_type_creategroup;
+	writer.WriteData(htonl(cmd));
+	writer.WriteData(htonl(m_seq));
+
+	if (!reader.parse(data, root))
+	{
+		response["code"] = 101;
+		response["msg"] = "json parse failed!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		TcpSession::Send(conn, writer);
+		return;
+	}
+
+	if (!root["groupname"].isString())
+	{
+		response["code"] = 102;
+		response["msg"] = "invalid parameter!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		TcpSession::Send(conn, writer);
+		return;
+	}
+
+	string groupname = root["groupname"].asString();
+	int32_t groupid = 0;
+	UserManager& userMgr = Singleton<UserManager>::instance();
+
+	if (userMgr.AddGroup(groupname.c_str(), m_user->userid, groupid))
+	{
+		//群主自动加入群组
+		OnAddGroupResponse(conn, groupid);
+		response["code"] = 0;
+		response["msg"] = "ok";
+		response["groupid"] = groupid;
+		response["groupname"] = groupname;
+	}
+	else
+	{
+		response["code"] = 100;
+		response["msg"] = "create group failed!";
+	}
+
+	result = response.toStyledString();
+	writer.WriteData(result);
+	TcpSession::Send(conn, writer);
+	printf("%s(%d): %s\r\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 void ClientSession::OnGetGroupMembersResponse(const TcpConnectionPtr& conn, const string& data)
 {
+	BinaryWriter writer;
+	string result;
+	Json::Reader reader;
+	Json::Value root, response;
+	int cmd = msg_type_getgroupmembers;
+	writer.WriteData(htonl(cmd));
+	writer.WriteData(htonl(m_seq));
+
+	if (!reader.parse(data, root))
+	{
+		response["code"] = 101;
+		response["msg"] = "json parse failed!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		TcpSession::Send(conn, writer);
+		return;
+	}
+
+	if (!root["groupid"].isInt())
+	{
+		response["code"] = 102;
+		response["msg"] = "invalid parameter!";
+		result = response.toStyledString();
+		writer.WriteData(result);
+		TcpSession::Send(conn, writer);
+		return;
+	}
+
+	int32_t groupid = root["groupid"].asInt();
+	list<UserPtr> members;
+	if (Singleton<UserManager>::instance().GetFriendInfoByUserID(groupid, members))
+	{
+		response["code"] = 0;
+		response["msg"] = "ok";
+		response["members"] = Json::Value(Json::arrayValue);
+		for (const auto& member : members)
+		{
+			Json::Value m;
+			m["userid"] = member->userid;
+			m["username"] = member->username;
+			m["nickname"] = member->nickname;
+			m["facetype"] = member->facetype;
+			m["customface"] = member->customface;
+			m["gender"] = member->gender;
+			m["birthday"] = member->birthday;
+			m["signature"] = member->signature;
+			m["address"] = member->address;
+			m["phonenumber"] = member->phonenumber;
+			m["mail"] = member->mail;
+			m["status"] = member->status;
+			response["members"].append(m);
+		}
+	}
+	else
+	{
+		response["code"] = 100;
+		response["msg"] = "get group members failed!";
+	}
+
+	result = response.toStyledString();
+	writer.WriteData(result);
+	TcpSession::Send(conn, writer);
+	printf("%s(%d): %s\r\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 void ClientSession::OnChatResponse(const TcpConnectionPtr& conn, const string& data)
@@ -447,12 +794,44 @@ void ClientSession::OnMultiChatResponse(const TcpConnectionPtr& conn, const stri
 
 void ClientSession::DeleteFriend(const TcpConnectionPtr& conn, int32_t friendid)
 {
+	//通知被删除的好友（推送状态变更消息）
+	IMSer& imserver = Singleton<IMSer>::instance();
+	ClientSessionPtr targetSession = imserver.GetSessionByID(friendid);
+	if (targetSession)
+	{
+		BinaryWriter writer;
+		writer.WriteData(htonl(msg_type_userstatuschange));
+		writer.WriteData(htonl(0));
+		Json::Value notify;
+		notify["type"] = 3;  //3表示被删除好友
+		notify["userid"] = m_user->userid;
+		writer.WriteData(notify.toStyledString());
+		targetSession->Send(writer);
+	}
+	printf("%s(%d): %s, userid=%d, friendid=%d\r\n",
+		__FILE__, __LINE__, __FUNCTION__, m_user->userid, friendid);
 }
 
 void ClientSession::OnAddGroupResponse(const TcpConnectionPtr& conn, int32_t groupid)
 {
+	//将当前用户加入群组（建立用户与群ID的好友关系）
+	int32_t smallid = (m_user->userid < groupid) ? m_user->userid : groupid;
+	int32_t greatid = (m_user->userid < groupid) ? groupid : m_user->userid;
+	Singleton<UserManager>::instance().MakeFriendRelationship(smallid, greatid);
+	printf("%s(%d): %s, userid=%d, groupid=%d\r\n",
+		__FILE__, __LINE__, __FUNCTION__, m_user->userid, groupid);
 }
 
 void ClientSession::SendUserStatusChangeMsg(int32_t userid, int type)
 {
+	BinaryWriter writer;
+	writer.WriteData(htonl(msg_type_userstatuschange));
+	writer.WriteData(htonl(0));
+	Json::Value notify;
+	notify["type"] = type;  //1上线 0离线
+	notify["userid"] = userid;
+	writer.WriteData(notify.toStyledString());
+	TcpSession::Send(m_conn, writer);
+	printf("%s(%d): %s, userid=%d, type=%d\r\n",
+		__FILE__, __LINE__, __FUNCTION__, userid, type);
 }

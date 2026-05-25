@@ -6,6 +6,22 @@
 using namespace std;
 using namespace muduo;
 
+namespace {
+    // SQL字符串转义：将单引号替换为两个单引号（SQL标准转义），防止SQL注入
+    string EscapeSqlString(const string& str) {
+        string result;
+        result.reserve(str.size());
+        for (char c : str) {
+            if (c == '\'') {
+                result += "''";
+            } else {
+                result += c;
+            }
+        }
+        return result;
+    }
+}
+
 bool UserManager::init()
 {
 	//加载用户信息（所有的用户）
@@ -30,9 +46,9 @@ bool UserManager::AddUser(User& user)
 {
 	stringstream sql;
 	m_baseUserID++;//自增用户ID基数，确保每个用户都有一个唯一的ID
-	sql << "INSERT INTO t_user (f_user_id, f_username, f_nickname, f_password, f_register_time)" << 
-		"VALUES (" << m_baseUserID << ", '" << user.username << "', '" 
-		<< user.nickname << "', '" << user.password << "', NOW())";
+	sql << "INSERT INTO t_user (f_user_id, f_username, f_nickname, f_password, f_register_time)" <<
+		"VALUES (" << m_baseUserID << ", '" << EscapeSqlString(user.username) << "', '"
+		<< EscapeSqlString(user.nickname) << "', '" << EscapeSqlString(user.password) << "', NOW())";
 	//构造SQL插入语句，将用户信息插入到数据库中，假设t_user表已经存在，并且包含相应的字段
 	bool result = Singleton<MySqlManager>::instance().Execute(sql.str());//调用MySqlManager的Execute方法执行SQL语句，如果执行失败，则输出错误信息并返回false
 	if(result == false)
@@ -84,10 +100,7 @@ bool UserManager::LoadUserFromDB()
 		{
 			lock_guard<mutex> guard(m_mutex);//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
 			m_cachedUsers.push_back(std::make_shared<User>(u));
-			{
-				lock_guard<mutex> guard(m_mutex);
-				m_mapUsers[u.userid] = make_shared<User>(u);
-			}
+			m_mapUsers[u.userid] = make_shared<User>(u);
 		}
 		if(u.userid > m_baseUserID)
 		{
@@ -145,7 +158,19 @@ bool UserManager::GetUserInfoUsername(const string& name, UserPtr& user)
 
 bool UserManager::GetFriendInfoByUserID(int32_t userid, list<UserPtr>& friends)
 {
-	return false;
+	lock_guard<mutex> guard(m_mutex);
+	iterMapUser iter = m_mapUsers.find(userid);
+	if (iter == m_mapUsers.end()) return false;
+	//遍历该用户的好友ID集合，查找每个好友的详细信息并加入结果列表
+	for (int32_t friendid : iter->second->friends)
+	{
+		iterMapUser itFriend = m_mapUsers.find(friendid);
+		if (itFriend != m_mapUsers.end())
+		{
+			friends.push_back(itFriend->second);
+		}
+	}
+	return true;
 }
 
 UserPtr UserManager::GetUserByID(int32_t userid)
@@ -181,30 +206,144 @@ bool UserManager::MakeFriendRelationship(int32_t smallid, int32_t greatid)
 
 bool UserManager::ReleaseFriendRelationship(int32_t smallid, int32_t greatid)
 {
-	return false;
+	if (smallid >= greatid) return false;
+	stringstream sql;
+	sql << "DELETE FROM t_user_relationship WHERE f_user_id1 = "
+		<< smallid << " AND f_user_id2 = " << greatid;
+	if (!Singleton<MySqlManager>::instance().Execute(sql.str()))
+	{
+		return false;
+	}
+	//更新缓存中双方的好友列表
+	lock_guard<mutex> guard(m_mutex);
+	iterMapUser itSmall = m_mapUsers.find(smallid);
+	if (itSmall != m_mapUsers.end())
+	{
+		itSmall->second->friends.erase(greatid);
+	}
+	iterMapUser itGreat = m_mapUsers.find(greatid);
+	if (itGreat != m_mapUsers.end())
+	{
+		itGreat->second->friends.erase(smallid);
+	}
+	return true;
 }
 
 bool UserManager::UpdateUserInfo(int32_t userid, const User& newuserinfo)
 {
-	return false;
+	stringstream sql;
+	sql << "UPDATE t_user SET "
+		<< "f_nickname = '" << EscapeSqlString(newuserinfo.nickname) << "', "
+		<< "f_facetype = " << newuserinfo.facetype << ", "
+		<< "f_customface = '" << EscapeSqlString(newuserinfo.customface) << "', "
+		<< "f_gender = " << newuserinfo.gender << ", "
+		<< "f_birthday = " << newuserinfo.birthday << ", "
+		<< "f_signature = '" << EscapeSqlString(newuserinfo.signature) << "', "
+		<< "f_address = '" << EscapeSqlString(newuserinfo.address) << "', "
+		<< "f_phonenumber = '" << EscapeSqlString(newuserinfo.phonenumber) << "', "
+		<< "f_mail = '" << EscapeSqlString(newuserinfo.mail) << "' "
+		<< "WHERE f_user_id = " << userid;
+	if (!Singleton<MySqlManager>::instance().Execute(sql.str()))
+	{
+		return false;
+	}
+	//更新缓存中的用户信息
+	lock_guard<mutex> guard(m_mutex);
+	iterMapUser iter = m_mapUsers.find(userid);
+	if (iter != m_mapUsers.end())
+	{
+		iter->second->nickname = newuserinfo.nickname;
+		iter->second->facetype = newuserinfo.facetype;
+		iter->second->customface = newuserinfo.customface;
+		iter->second->gender = newuserinfo.gender;
+		iter->second->birthday = newuserinfo.birthday;
+		iter->second->signature = newuserinfo.signature;
+		iter->second->address = newuserinfo.address;
+		iter->second->phonenumber = newuserinfo.phonenumber;
+		iter->second->mail = newuserinfo.mail;
+	}
+	return true;
 }
 
 bool UserManager::ModifyUserPassword(int32_t userid, const string& newpassword)
 {
-	return false;
+	stringstream sql;
+	sql << "UPDATE t_user SET f_password = '"
+		<< EscapeSqlString(newpassword) << "' WHERE f_user_id = " << userid;
+	if (!Singleton<MySqlManager>::instance().Execute(sql.str()))
+	{
+		return false;
+	}
+	//更新缓存中的密码
+	lock_guard<mutex> guard(m_mutex);
+	iterMapUser iter = m_mapUsers.find(userid);
+	if (iter != m_mapUsers.end())
+	{
+		iter->second->password = newpassword;
+	}
+	return true;
 }
 
 bool UserManager::AddGroup(const char* groupname, int32_t ownerid, int32_t& groupid)
 {
-	return false;
+	m_baseGroupID++;
+	groupid = m_baseGroupID;
+	stringstream sql;
+	sql << "INSERT INTO t_user (f_user_id, f_username, f_nickname, f_owner_id, f_register_time) VALUES ("
+		<< groupid << ", '" << EscapeSqlString(groupname) << "', '"
+		<< EscapeSqlString(groupname) << "', " << ownerid << ", NOW())";
+	if (!Singleton<MySqlManager>::instance().Execute(sql.str()))
+	{
+		return false;
+	}
+	//将群组作为特殊用户加入缓存
+	User group;
+	group.userid = groupid;
+	group.username = groupname;
+	group.nickname = groupname;
+	group.ownerid = ownerid;
+	group.facetype = 0;
+	group.gender = 0;
+	group.birthday = 20000101;
+	{
+		lock_guard<mutex> guard(m_mutex);
+		m_cachedUsers.push_back(std::make_shared<User>(group));
+		m_mapUsers[groupid] = make_shared<User>(group);
+	}
+	return true;
 }
 
 bool UserManager::SaveChatMsgToDb(int32_t senderid, int32_t targetid, const string& chatmsg)
 {
-	return false;
+	stringstream sql;
+	sql << "INSERT INTO t_chatmsg (f_senderid, f_targetid, f_msgcontent) VALUES ("
+		<< senderid << ", " << targetid << ", '"
+		<< EscapeSqlString(chatmsg) << "')";
+	return Singleton<MySqlManager>::instance().Execute(sql.str());
 }
 
 bool UserManager::DeleteFriendToUser(int32_t userid, int32_t friendid)
 {
-	return false;
+	int32_t smallid = (userid < friendid) ? userid : friendid;
+	int32_t greatid = (userid < friendid) ? friendid : userid;
+	stringstream sql;
+	sql << "DELETE FROM t_user_relationship WHERE f_user_id1 = "
+		<< smallid << " AND f_user_id2 = " << greatid;
+	if (!Singleton<MySqlManager>::instance().Execute(sql.str()))
+	{
+		return false;
+	}
+	//更新缓存中双方的好友列表
+	lock_guard<mutex> guard(m_mutex);
+	iterMapUser iterUser = m_mapUsers.find(userid);
+	if (iterUser != m_mapUsers.end())
+	{
+		iterUser->second->friends.erase(friendid);
+	}
+	iterMapUser iterFriend = m_mapUsers.find(friendid);
+	if (iterFriend != m_mapUsers.end())
+	{
+		iterFriend->second->friends.erase(userid);
+	}
+	return true;
 }
