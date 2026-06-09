@@ -12,6 +12,11 @@
 #include<memory>
 #include<map>
 
+// 前向声明 proto 类型
+namespace im {
+class ChatMsg;
+}
+
 using namespace std;
 
 class User

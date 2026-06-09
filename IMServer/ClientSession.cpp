@@ -762,8 +762,7 @@ void ClientSession::OnGetChatHistoryResponse(const TcpConnectionPtr& conn,
     response.set_payload(rsp.SerializeAsString());
 
     m_codec->send(conn, response);
-    printf("%s(%d): %s, userid=%d
-", __FILE__, __LINE__, __FUNCTION__, m_user->userid);
+    printf("%s(%d): %s, userid=%d\n", __FILE__, __LINE__, __FUNCTION__, m_user->userid);
 }
 
 

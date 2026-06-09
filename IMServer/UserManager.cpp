@@ -1,6 +1,7 @@
 ﻿#include "UserManager.h"
 #include "MySqlManager.h"
 #include "base/Singleton.h"
+#include "im.pb.h"
 #include <sstream>
 
 using namespace std;
@@ -321,9 +322,9 @@ bool UserManager::AddGroup(const char* groupname, int32_t ownerid, int32_t& grou
 bool UserManager::SaveChatMsgToDb(int32_t senderid, int32_t targetid, const string& chatmsg)
 {
 	stringstream sql;
-	sql << "INSERT INTO t_chatmsg (f_senderid, f_targetid, f_msgcontent) VALUES ("
+	sql << "INSERT INTO t_chatmsg (f_senderid, f_targetid, f_msgcontent, f_createtime) VALUES ("
 		<< senderid << ", " << targetid << ", '"
-		<< EscapeSqlString(chatmsg) << "')";
+		<< EscapeSqlString(chatmsg) << "', NOW())";
 	return Singleton<MySqlManager>::instance().Execute(sql.str());
 }
 
