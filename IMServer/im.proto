@@ -1,0 +1,212 @@
+// IM服务器通信协议定义
+// 使用protobuf3语法，提供强类型、紧凑编码、前后兼容的消息格式
+syntax = "proto3";
+
+package im;
+
+// ============================================================
+// 统一消息容器 —— 所有IM消息的外层封装
+// 替换原有二进制协议中的 [cmd:4B][seq:4B][data:varint+bytes]
+// ============================================================
+message MessageContainer {
+    // 消息类型，对应原有 ClientSession.h 中的枚举值
+    // 1000=心跳, 1001=注册, 1002=登录, 1003=好友列表, 1004=查找用户
+    // 1005=操作好友, 1006=用户状态变更, 1007=更新用户信息, 1008=修改密码
+    // 1009=创建群组, 1010=群成员, 1100=单聊, 1101=群发
+    int32 cmd        = 1;
+
+    // 消息序号，用于请求/响应匹配
+    int32 seq        = 2;
+
+    // 单聊目标用户ID或群ID (仅聊天消息使用)
+    int32 target_id  = 3;
+
+    // 群发目标列表，JSON数组字符串 (仅群发消息使用)
+    string targets   = 4;
+
+    // 具体业务消息载荷
+    // 根据cmd类型选择对应的子消息进行序列化/反序列化
+    // cmd=1000 → 空 (心跳无需载荷)
+    // cmd=1001 → RegisterReq / RegisterRsp
+    // cmd=1002 → LoginReq / LoginRsp
+    // cmd=1003 → FriendListRsp
+    // cmd=1004 → FindUserReq / FindUserRsp
+    // cmd=1005 → OperateFriendReq / OperateFriendRsp
+    // cmd=1006 → UserStatusChangeNotify
+    // cmd=1007 → UpdateUserInfoReq / CommonRsp
+    // cmd=1008 → ModifyPasswordReq / CommonRsp
+    // cmd=1009 → CreateGroupReq / CreateGroupRsp
+    // cmd=1010 → GetGroupMembersReq / GetGroupMembersRsp
+    // cmd=1100 → ChatMsg
+    // cmd=1101 → MultiChatTargets
+    bytes payload   = 5;
+}
+
+// ============================================================
+// 通用响应 —— 所有无特殊返回数据的操作使用此消息
+// ============================================================
+message CommonRsp {
+    int32 code = 1;     // 0=成功, >0=错误码
+    string msg = 2;     // 提示信息
+}
+
+// ============================================================
+// 用户信息 —— 所有用户数据传递的统一结构
+// ============================================================
+message UserInfo {
+    int32  userid      = 1;
+    string username    = 2;
+    string nickname    = 3;
+    int32  facetype    = 4;
+    string customface  = 5;
+    int32  gender      = 6;
+    int32  birthday    = 7;
+    string signature   = 8;
+    string address     = 9;
+    string phonenumber = 10;
+    string mail        = 11;
+    int32  status      = 12;   // 0=离线, 1=在线
+    int32  clienttype  = 13;   // 客户端类型(好友列表中使用)
+}
+
+// ============================================================
+// 注册 (cmd=1001)
+// ============================================================
+message RegisterReq {
+    string username = 1;   // 手机号
+    string nickname = 2;   // 昵称
+    string password = 3;   // 密码
+}
+
+message RegisterRsp {
+    int32 code    = 1;
+    string msg    = 2;
+}
+
+// ============================================================
+// 登录 (cmd=1002)
+// ============================================================
+message LoginReq {
+    string username   = 1;
+    string password   = 2;
+    int32  clienttype = 3;
+    int32  status     = 4;
+}
+
+message LoginRsp {
+    int32    code    = 1;
+    string   msg     = 2;
+    UserInfo user    = 3;    // 登录成功时返回用户完整信息
+}
+
+// ============================================================
+// 获取好友列表 (cmd=1003)
+// ============================================================
+message FriendListRsp {
+    int32              code  = 1;
+    string             msg   = 2;
+    repeated UserInfo  friends = 3;   // 好友列表
+}
+
+// ============================================================
+// 查找用户 (cmd=1004)
+// ============================================================
+message FindUserReq {
+    string type    = 1;    // "username" 或 "userid"
+    string keyword = 2;    // 查找关键词
+}
+
+message FindUserRsp {
+    int32    code = 1;
+    string   msg  = 2;
+    UserInfo user = 3;    // 查找到的用户信息
+}
+
+// ============================================================
+// 操作好友 (cmd=1005)
+// type=1: 添加好友, type=2: 删除好友, type=3: 邀请入群
+// ============================================================
+message OperateFriendReq {
+    int32 type     = 1;    // 1=添加, 2=删除
+    int32 friendid = 2;
+}
+
+message OperateFriendRsp {
+    int32  code = 1;
+    string msg  = 2;
+}
+
+// ============================================================
+// 用户状态变更通知 (cmd=1006)
+// 由服务端推送给好友，无需请求
+// ============================================================
+message UserStatusChangeNotify {
+    int32 type   = 1;    // 1=上线, 0=离线, 3=被删除好友
+    int32 userid = 2;
+}
+
+// ============================================================
+// 更新用户信息 (cmd=1007)
+// ============================================================
+message UpdateUserInfoReq {
+    string nickname    = 1;
+    int32  facetype    = 2;
+    string customface  = 3;
+    int32  gender      = 4;
+    int32  birthday    = 5;
+    string signature   = 6;
+    string address     = 7;
+    string phonenumber = 8;
+    string mail        = 9;
+}
+
+// ============================================================
+// 修改密码 (cmd=1008)
+// ============================================================
+message ModifyPasswordReq {
+    string oldpassword = 1;
+    string newpassword = 2;
+}
+
+// ============================================================
+// 创建群组 (cmd=1009)
+// ============================================================
+message CreateGroupReq {
+    string groupname = 1;
+}
+
+message CreateGroupRsp {
+    int32  code      = 1;
+    string msg       = 2;
+    int32  groupid   = 3;
+    string groupname = 4;
+}
+
+// ============================================================
+// 获取群成员 (cmd=1010)
+// ============================================================
+message GetGroupMembersReq {
+    int32 groupid = 1;
+}
+
+message GetGroupMembersRsp {
+    int32             code    = 1;
+    string            msg     = 2;
+    repeated UserInfo members = 3;   // 群成员列表
+}
+
+// ============================================================
+// 聊天消息 (cmd=1100 单聊, cmd=1101 群发)
+// ============================================================
+message ChatMsg {
+    int32  senderid  = 1;    // 发送者ID
+    int32  targetid  = 2;    // 接收者ID (单聊) 或 群ID (群聊)
+    string content   = 3;    // 消息内容
+    int64  timestamp = 4;    // 消息时间戳
+}
+
+// 群发消息的目标列表 (cmd=1101 的 payload)
+message MultiChatTargets {
+    repeated int32 targets = 1;   // 群发目标用户ID列表
+    string         content = 2;   // 消息内容
+}
