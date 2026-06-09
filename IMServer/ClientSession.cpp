@@ -354,6 +354,11 @@ void ClientSession::OnFindUserResponse(const TcpConnectionPtr& conn,
             rsp.set_code(103);
             rsp.set_msg("user not found!");
         }
+        else if (user->userid >= GROUPID_BOUNDARY)
+        {
+            rsp.set_code(105);
+            rsp.set_msg("cannot search for group!");
+        }
         else
         {
             rsp.set_code(0);
@@ -407,12 +412,25 @@ void ClientSession::OnOperateFriendResponse(const TcpConnectionPtr& conn,
 
         if (req.type() == 1)  // 添加好友
         {
-            int32_t smallid = (m_user->userid < friendid) ? m_user->userid : friendid;
-            int32_t greatid = (m_user->userid < friendid) ? friendid : m_user->userid;
-            if (userMgr.MakeFriendRelationship(smallid, greatid))
+            // 不允许将群组添加为好友
+            if (friendid >= GROUPID_BOUNDARY)
+            {
+                rsp.set_code(106);
+                rsp.set_msg("cannot add group as friend!");
+            }
+            else if (userMgr.MakeFriendRelationship(
+                (m_user->userid < friendid) ? m_user->userid : friendid,
+                (m_user->userid < friendid) ? friendid : m_user->userid))
             {
                 rsp.set_code(0);
                 rsp.set_msg("ok");
+                // 通知被添加方刷新好友列表
+                IMSer& imserver = Singleton<IMSer>::instance();
+                ClientSessionPtr targetSession = imserver.GetSessionByID(friendid);
+                if (targetSession)
+                {
+                    targetSession->SendUserStatusChangeMsg(m_user->userid, 4);  // type=4: 被添加好友
+                }
             }
             else
             {
