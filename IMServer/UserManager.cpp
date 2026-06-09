@@ -102,15 +102,15 @@ bool UserManager::LoadUserFromDB()
 			m_cachedUsers.push_back(std::make_shared<User>(u));
 			m_mapUsers[u.userid] = make_shared<User>(u);
 		}
-		if(u.userid > m_baseUserID)
+		if(u.userid < 0xFFFFFFF && u.userid > m_baseUserID)
 		{
-			m_baseUserID = u.userid;//更新基数，确保每个用户都有一个唯一的ID
+			m_baseUserID = u.userid;//更新基数，排除群ID，确保用户ID不落入群ID范围
 		}
-		if (result->NextRow() == false) break;//如果没有更多数据可供获取，跳出循环
 		if(u.userid >= 0xFFFFFFF && u.userid > m_baseGroupID)
 		{
-			m_baseGroupID = u.userid;
+			m_baseGroupID = u.userid;//更新群ID基数，确保重启后群ID不冲突
 		}
+		if (result->NextRow() == false) break;//如果没有更多数据可供获取，跳出循环
 	}
 	result->EndQuery();//结束查询，释放资源
 	return true;
