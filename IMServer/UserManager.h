@@ -63,6 +63,7 @@ public:
 	bool ModifyUserPassword(int32_t userid, const string& newpassword);
 	bool AddGroup(const char* groupname, int32_t ownerid, int32_t& groupid);
 	bool SaveChatMsgToDb(int32_t senderid, int32_t targetid, const string& chatmsg);
+	bool GetChatHistory(int32_t userid, int32_t targetid, std::list<im::ChatMsg>& messages, int limit = 50);
 	bool DeleteFriendToUser(int32_t userid, int32_t friendid);
 
 private:

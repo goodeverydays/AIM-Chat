@@ -327,6 +327,41 @@ bool UserManager::SaveChatMsgToDb(int32_t senderid, int32_t targetid, const stri
 	return Singleton<MySqlManager>::instance().Execute(sql.str());
 }
 
+bool UserManager::GetChatHistory(int32_t userid, int32_t targetid, std::list<im::ChatMsg>& messages, int limit)
+{
+	stringstream sql;
+	if (targetid >= 0xFFFFFFF)
+	{
+		// 群聊：查所有发给该群的消息
+		sql << "SELECT f_senderid, f_targetid, f_msgcontent, UNIX_TIMESTAMP(f_createtime) FROM t_chatmsg "
+			<< "WHERE f_targetid = " << targetid << " ORDER BY f_createtime DESC LIMIT " << limit;
+	}
+	else
+	{
+		// 单聊：查双向消息
+		sql << "SELECT f_senderid, f_targetid, f_msgcontent, UNIX_TIMESTAMP(f_createtime) FROM t_chatmsg "
+			<< "WHERE (f_senderid = " << userid << " AND f_targetid = " << targetid << ") "
+			<< "OR (f_senderid = " << targetid << " AND f_targetid = " << userid << ") "
+			<< "ORDER BY f_createtime DESC LIMIT " << limit;
+	}
+	QueryResultPtr result = Singleton<MySqlManager>::instance().Query(sql.str());
+	if (result == NULL) return false;
+	while (result != NULL)
+	{
+		Field* pRow = result->Fetch();
+		if (pRow == NULL) break;
+		im::ChatMsg msg;
+		msg.set_senderid(pRow[0].toInt32());
+		msg.set_targetid(pRow[1].toInt32());
+		msg.set_content(pRow[2].GetString());
+		msg.set_timestamp(pRow[3].toInt64());
+		messages.push_back(msg);
+		if (result->NextRow() == false) break;
+	}
+	result->EndQuery();
+	return true;
+}
+
 bool UserManager::DeleteFriendToUser(int32_t userid, int32_t friendid)
 {
 	int32_t smallid = (userid < friendid) ? userid : friendid;

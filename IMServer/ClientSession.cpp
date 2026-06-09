@@ -90,6 +90,9 @@ void ClientSession::OnMessageReceived(const TcpConnectionPtr& conn,
     case msg_type_getgroupmembers:
         OnGetGroupMembersResponse(conn, msg);
         break;
+    case msg_type_getchathistory:
+        OnGetChatHistoryResponse(conn, msg);
+        break;
     case msg_type_chat:
         OnChatResponse(conn, msg);
         break;
@@ -713,6 +716,56 @@ void ClientSession::OnGetGroupMembersResponse(const TcpConnectionPtr& conn,
     m_codec->send(conn, response);
     printf("%s(%d): %s\r\n", __FILE__, __LINE__, __FUNCTION__);
 }
+
+// ============================================================
+// 获取聊天历史 (cmd=1011)
+// 请求: ChatHistoryReq { targetid }
+// 响应: ChatHistoryRsp { code, msg, targetid, messages[] }
+// ============================================================
+void ClientSession::OnGetChatHistoryResponse(const TcpConnectionPtr& conn,
+                                              const im::MessageContainer& msg)
+{
+    im::ChatHistoryReq req;
+    im::ChatHistoryRsp rsp;
+
+    if (!req.ParseFromString(msg.payload()))
+    {
+        rsp.set_code(101);
+        rsp.set_msg("protobuf parse failed!");
+    }
+    else
+    {
+        int32_t targetid = req.targetid();
+        std::list<im::ChatMsg> messages;
+        UserManager& userMgr = Singleton<UserManager>::instance();
+
+        if (userMgr.GetChatHistory(m_user->userid, targetid, messages, 50))
+        {
+            rsp.set_code(0);
+            rsp.set_msg("ok");
+            rsp.set_targetid(targetid);
+            for (const auto& m : messages)
+            {
+                *rsp.add_messages() = m;
+            }
+        }
+        else
+        {
+            rsp.set_code(100);
+            rsp.set_msg("get chat history failed!");
+        }
+    }
+
+    im::MessageContainer response;
+    response.set_cmd(msg_type_getchathistory);
+    response.set_seq(m_seq);
+    response.set_payload(rsp.SerializeAsString());
+
+    m_codec->send(conn, response);
+    printf("%s(%d): %s, userid=%d
+", __FILE__, __LINE__, __FUNCTION__, m_user->userid);
+}
+
 
 // ============================================================
 // 单聊消息处理 (cmd=1100)

@@ -4,6 +4,8 @@ syntax = "proto3";
 
 package im;
 
+option optimize_for = LITE_RUNTIME;
+
 // ============================================================
 // 统一消息容器 —— 所有IM消息的外层封装
 // 替换原有二进制协议中的 [cmd:4B][seq:4B][data:varint+bytes]
@@ -12,7 +14,7 @@ message MessageContainer {
     // 消息类型，对应原有 ClientSession.h 中的枚举值
     // 1000=心跳, 1001=注册, 1002=登录, 1003=好友列表, 1004=查找用户
     // 1005=操作好友, 1006=用户状态变更, 1007=更新用户信息, 1008=修改密码
-    // 1009=创建群组, 1010=群成员, 1100=单聊, 1101=群发
+    // 1011=聊天历史, 1100=单聊, 1101=群发
     int32 cmd        = 1;
 
     // 消息序号，用于请求/响应匹配
@@ -209,4 +211,18 @@ message ChatMsg {
 message MultiChatTargets {
     repeated int32 targets = 1;   // 群发目标用户ID列表
     string         content = 2;   // 消息内容
+}
+
+// ============================================================
+// 获取聊天历史 (cmd=1011)
+// ============================================================
+message ChatHistoryReq {
+    int32 targetid = 1;   // 对方用户ID（单聊）或群ID（群聊）
+}
+
+message ChatHistoryRsp {
+    int32              code     = 1;
+    string             msg      = 2;
+    int32              targetid = 3;
+    repeated ChatMsg   messages = 4;
 }

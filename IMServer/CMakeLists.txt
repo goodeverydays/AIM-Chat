@@ -24,7 +24,13 @@ if(NOT MYSQL_LIB)
 	message(FATAL_ERROR "not found mysqlclient.so at /usr/lib64/mysql/")
 endif(NOT MYSQL_LIB)#必须进行匹配
 
-include_directories(. ./base ./net ./third_party/jsoncpp/include)
+# --- Protobuf 依赖（IM协议编解码）---
+find_package(Protobuf REQUIRED)
+
+# 编译 .proto 文件生成 C++ 代码
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/im.proto)
+
+include_directories(. ./base ./net ./third_party/jsoncpp/include ${CMAKE_CURRENT_BINARY_DIR})
 
 set(muduo_srcs
 base/Timestamp.cc
@@ -71,13 +77,15 @@ MySqlManager.cpp
 
 )
 
-set(chat_srcs  
+set(chat_srcs
 IMServer.cpp
 IMSer.cpp
 ClientSession.cpp
 UserManager.cpp
-BinaryReader.cpp
 MsgCacheManager.cpp
+IMCodec.cpp                # protobuf编解码适配层
+net/protobuf/ProtobufCodecLite.cc
+${PROTO_SRCS}              # protoc生成的 im.pb.cc
 )
 
 set(file_srcs 
@@ -89,7 +97,7 @@ add_subdirectory(third_party/jsoncpp)
 
 add_executable (imchatserver ${chat_srcs} ${muduo_srcs} ${mysql_srcs})
 #只是确认库存在或者设置库目录，是没有用的，需要链接进来才能起效果
-target_link_libraries(imchatserver mysqlclient jsoncpp)
+target_link_libraries(imchatserver mysqlclient jsoncpp ${Protobuf_LIBRARIES} z)
 
 add_executable (imfileserver ${file_srcs} ${muduo_srcs})
 #只是确认库存在或者设置库目录，是没有用的，需要链接进来才能起效果
