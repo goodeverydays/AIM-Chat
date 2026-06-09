@@ -107,6 +107,10 @@ bool UserManager::LoadUserFromDB()
 			m_baseUserID = u.userid;//更新基数，确保每个用户都有一个唯一的ID
 		}
 		if (result->NextRow() == false) break;//如果没有更多数据可供获取，跳出循环
+		if(u.userid >= 0xFFFFFFF && u.userid > m_baseGroupID)
+		{
+			m_baseGroupID = u.userid;
+		}
 	}
 	result->EndQuery();//结束查询，释放资源
 	return true;
