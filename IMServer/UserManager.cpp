@@ -64,6 +64,7 @@ bool UserManager::AddUser(User& user)
 	{
 		lock_guard<mutex> guard(m_mutex);//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
 		m_cachedUsers.push_back(std::make_shared<User>(user));//将用户对象拷贝到堆上并添加到缓存列表中
+		m_mapUsers[user.userid] = make_shared<User>(user);//同步加入映射表，确保新注册用户可被MakeFriendRelationship等查找
 	}
 	return true;
 }
