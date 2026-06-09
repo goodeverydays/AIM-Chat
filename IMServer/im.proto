@@ -4,7 +4,8 @@ syntax = "proto3";
 
 package im;
 
-option optimize_for = LITE_RUNTIME;
+// 服务端使用完整 protobuf 库，不指定 LITE_RUNTIME
+// （客户端才需要 LITE_RUNTIME 以匹配 libprotobuf-lite）
 
 // ============================================================
 // 统一消息容器 —— 所有IM消息的外层封装
