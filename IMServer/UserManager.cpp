@@ -293,9 +293,9 @@ bool UserManager::AddGroup(const char* groupname, int32_t ownerid, int32_t& grou
 	m_baseGroupID++;
 	groupid = m_baseGroupID;
 	stringstream sql;
-	sql << "INSERT INTO t_user (f_user_id, f_username, f_nickname, f_owner_id, f_register_time) VALUES ("
+	sql << "INSERT INTO t_user (f_user_id, f_username, f_nickname, f_password, f_owner_id, f_register_time) VALUES ("
 		<< groupid << ", '" << EscapeSqlString(groupname) << "', '"
-		<< EscapeSqlString(groupname) << "', " << ownerid << ", NOW())";
+		<< EscapeSqlString(groupname) << "', '', " << ownerid << ", NOW())";
 	if (!Singleton<MySqlManager>::instance().Execute(sql.str()))
 	{
 		return false;
