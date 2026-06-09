@@ -748,11 +748,13 @@ void ClientSession::OnChatResponse(const TcpConnectionPtr& conn,
         return;
     }
 
-    // 群聊消息：遍历群成员转发
+    // 群聊消息：遍历群成员转发（跳过发送者本人）
     std::list<UserPtr> friends;
     userMgr.GetFriendInfoByUserID(m_target, friends);
     for (const auto& iter : friends)
     {
+        if (iter->userid == m_user->userid)
+            continue;  // 不转发给发送者，避免客户端重复显示
         ClientSessionPtr targetSession = imserver.GetSessionByID(iter->userid);
         if (!targetSession)
         {
