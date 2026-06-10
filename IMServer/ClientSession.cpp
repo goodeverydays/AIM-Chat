@@ -805,11 +805,9 @@ void ClientSession::OnChatResponse(const TcpConnectionPtr& conn,
 #ifdef HAVE_AGENT_GRPC
         IMSer& imserver = Singleton<IMSer>::instance();
         AgentGrpcClient* agent = imserver.GetAgentClient();
-        // 获取当前会话的 TCP 连接（在 Agent 异步回调中使用）
-        TcpConnectionPtr connPtr = m_conn.lock();
-        if (agent && connPtr) {
+        if (agent && m_conn) {
             agent->sendMessage(m_user->userid, m_target, chatMsg.content(), 1,
-                [this, connPtr](bool ok, const std::string& reply) {
+                [this](bool ok, const std::string& reply) {
                     // 构造 Agent 回复的 ChatMsg
                     im::ChatMsg agentReply;
                     agentReply.set_senderid(-1);
@@ -825,7 +823,7 @@ void ClientSession::OnChatResponse(const TcpConnectionPtr& conn,
                     container.set_payload(agentReply.SerializeAsString());
 
                     if (m_codec) {
-                        m_codec->send(connPtr, container);
+                        m_codec->send(m_conn, container);
                     }
                 });
         }
@@ -1006,7 +1004,7 @@ void ClientSession::OnAvatarUploadResponse(const TcpConnectionPtr& conn,
 
                 // 更新用户的 customface
                 m_user->customface = result.url;
-                Singleton<UserManager>::instance().UpdateUserInfo(*m_user);
+                Singleton<UserManager>::instance().UpdateUserInfo(m_user->userid, *m_user);
             } else {
                 rsp.set_code(2);
                 rsp.set_msg(result.errMsg);
