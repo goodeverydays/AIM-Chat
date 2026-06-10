@@ -3,6 +3,9 @@
 #include "IMCodec.h"
 #include "im.pb.h"                     // protoc生成的消息头文件
 #include "UserManager.h"
+#ifdef HAVE_AGENT_GRPC
+#include "AgentGrpcClient.h"
+#endif
 // 注意: jsoncpp依赖已由protobuf替代，此文件不再直接使用jsoncpp
 
 using namespace muduo::net;
@@ -790,6 +793,55 @@ void ClientSession::OnChatResponse(const TcpConnectionPtr& conn,
     printf("%s(%d): %s target:%d cur:%d\r\n",
         __FILE__, __LINE__, __FUNCTION__, m_target, m_user->userid);
     std::cout << chatMsg.content() << std::endl;
+
+    // --- Agent 智能助手路由 ---
+    // target_id = -1 表示消息发往 AI Agent，由 IMServer 通过 gRPC 转发到 goagent
+    constexpr int32_t AGENT_USERID = -1;
+    if (m_target == AGENT_USERID) {
+#ifdef HAVE_AGENT_GRPC
+        IMSer& imserver = Singleton<IMSer>::instance();
+        AgentGrpcClient* agent = imserver.GetAgentClient();
+        // 获取当前会话的 TCP 连接（在 Agent 异步回调中使用）
+        TcpConnectionPtr connPtr = m_conn.lock();
+        if (agent && connPtr) {
+            agent->sendMessage(m_user->userid, m_target, chatMsg.content(), 1,
+                [this, connPtr](bool ok, const std::string& reply) {
+                    // 构造 Agent 回复的 ChatMsg
+                    im::ChatMsg agentReply;
+                    agentReply.set_senderid(-1);
+                    agentReply.set_targetid(m_user->userid);
+                    agentReply.set_content(ok ? reply : ("[Agent不可用] " + reply));
+                    agentReply.set_timestamp(time(nullptr));
+
+                    // 封装到 MessageContainer 推送给客户端
+                    im::MessageContainer container;
+                    container.set_cmd(msg_type_chat);
+                    container.set_target_id(m_user->userid);
+                    container.set_seq(m_seq);
+                    container.set_payload(agentReply.SerializeAsString());
+
+                    if (m_codec) {
+                        m_codec->send(connPtr, container);
+                    }
+                });
+        }
+#else
+        // gRPC 不可用时返回错误提示
+        im::ChatMsg agentReply;
+        agentReply.set_senderid(-1);
+        agentReply.set_targetid(m_user->userid);
+        agentReply.set_content("[Agent未配置]\ngRPC client not built. "
+                               "Install libgrpc++-dev and rebuild IMServer.");
+        agentReply.set_timestamp(time(nullptr));
+
+        forwardMsg.set_payload(agentReply.SerializeAsString());
+        m_codec->send(conn, forwardMsg);
+#endif
+
+        printf("%s(%d): %s Agent routed, reply pending\r\n",
+            __FILE__, __LINE__, __FUNCTION__);
+        return;
+    }
 
     UserManager& userMgr = Singleton<UserManager>::instance();
 
