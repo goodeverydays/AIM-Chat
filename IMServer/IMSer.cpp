@@ -1,9 +1,5 @@
 #include "IMSer.h"
 #include "ClientSession.h"
-#ifdef HAVE_AGENT_GRPC
-#include "AgentGrpcClient.h"
-#include "AvatarGrpcClient.h"
-#endif
 #include <sstream>
 
 using namespace std::placeholders;

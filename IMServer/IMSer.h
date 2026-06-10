@@ -13,8 +13,10 @@ using namespace muduo;
 using namespace muduo::net;
 
 class ClientSession;//前向声明，避免与ClientSession.h的循环依赖
-class AgentGrpcClient;
-class AvatarGrpcClient;
+#ifdef HAVE_AGENT_GRPC
+#include "AgentGrpcClient.h"
+#include "AvatarGrpcClient.h"
+#endif
 
 class IMSer final//final关键字表示这个类不能被继承，确保IMSer类的设计和实现不会被修改或扩展，保持其稳定性和安全性
 {
