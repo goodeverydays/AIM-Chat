@@ -2,6 +2,7 @@
 #include "ClientSession.h"
 #ifdef HAVE_AGENT_GRPC
 #include "AgentGrpcClient.h"
+#include "AvatarGrpcClient.h"
 #endif
 #include <sstream>
 
@@ -15,8 +16,9 @@ bool IMSer::init(const std::string& ip, short port, EventLoop* loop)
 	m_server->start();
 
 #ifdef HAVE_AGENT_GRPC
-	// 初始化 Agent gRPC 客户端（连接 goagent 微服务）
+	// 初始化 gRPC 客户端（连接微服务）
 	m_agentClient.reset(new AgentGrpcClient("127.0.0.1:19527"));
+	m_avatarClient.reset(new AvatarGrpcClient("127.0.0.1:19529"));
 #endif
 
 	return true;
@@ -68,5 +70,10 @@ std::shared_ptr<ClientSession> IMSer::GetSessionByID(int32_t userid)
 AgentGrpcClient* IMSer::GetAgentClient()
 {
 	return m_agentClient.get();
+}
+
+AvatarGrpcClient* IMSer::GetAvatarClient()
+{
+	return m_avatarClient.get();
 }
 #endif

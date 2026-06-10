@@ -41,10 +41,18 @@ if(gRPC_FOUND)
     protobuf_generate_grpc_cpp(AGENT_GRPC_SRCS AGENT_GRPC_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/agent.proto
         PLUGIN "protoc-gen-grpc=${GRPC_CPP_PLUGIN}")
 
+    # avatar.proto
+    protobuf_generate_cpp(AVATAR_PROTO_SRCS AVATAR_PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/avatar.proto)
+    protobuf_generate_grpc_cpp(AVATAR_GRPC_SRCS AVATAR_GRPC_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/avatar.proto
+        PLUGIN "protoc-gen-grpc=${GRPC_CPP_PLUGIN}")
+
     set(AGENT_SRCS
         AgentGrpcClient.cpp
+        AvatarGrpcClient.cpp
         ${AGENT_PROTO_SRCS}
         ${AGENT_GRPC_SRCS}
+        ${AVATAR_PROTO_SRCS}
+        ${AVATAR_GRPC_SRCS}
     )
     add_definitions(-DHAVE_AGENT_GRPC)
 else()

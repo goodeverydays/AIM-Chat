@@ -14,6 +14,7 @@ using namespace muduo::net;
 
 class ClientSession;//前向声明，避免与ClientSession.h的循环依赖
 class AgentGrpcClient;
+class AvatarGrpcClient;
 
 class IMSer final//final关键字表示这个类不能被继承，确保IMSer类的设计和实现不会被修改或扩展，保持其稳定性和安全性
 {
@@ -25,7 +26,8 @@ public:
 	bool init(const std::string& ip, short port, EventLoop* loop);
 	std::shared_ptr<ClientSession> GetSessionByID(int32_t userid);//根据用户ID查找对应的会话
 #ifdef HAVE_AGENT_GRPC
-	AgentGrpcClient* GetAgentClient();  // 获取 Agent gRPC 客户端
+	AgentGrpcClient* GetAgentClient();    // 获取 Agent gRPC 客户端
+	AvatarGrpcClient* GetAvatarClient();  // 获取 Avatar gRPC 客户端
 #endif
 
 protected:
@@ -36,7 +38,8 @@ private:
 	std::map<std::string, std::shared_ptr<ClientSession>> m_mapclient;//连接ID和连接对象的映射，方便根据连接ID查找和管理连接
 	std::mutex m_sessionlock;//保护m_mapclient的操作
 #ifdef HAVE_AGENT_GRPC
-	std::unique_ptr<AgentGrpcClient> m_agentClient;  // Agent gRPC 客户端（延迟初始化）
+	std::unique_ptr<AgentGrpcClient> m_agentClient;    // Agent gRPC 客户端
+	std::unique_ptr<AvatarGrpcClient> m_avatarClient;   // Avatar gRPC 客户端
 #endif
 };
 typedef std::pair<std::string, std::shared_ptr<ClientSession>> ConnPair;//定义一个连接对，包含连接ID和连接对象

@@ -48,6 +48,7 @@ enum {
     msg_type_creategroup,
     msg_type_getgroupmembers,
     msg_type_getchathistory,
+    msg_type_avatarupload,     // 1012: 上传头像
     // 聊天消息
     msg_type_chat = 1100,   // 单聊消息
     msg_type_multichat,     // 群发消息
@@ -105,6 +106,7 @@ protected:
     void OnCreateGroupResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
     void OnGetGroupMembersResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
     void OnGetChatHistoryResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
+    void OnAvatarUploadResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
     void OnChatResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
     void OnMultiChatResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
 

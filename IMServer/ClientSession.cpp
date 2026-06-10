@@ -5,6 +5,7 @@
 #include "UserManager.h"
 #ifdef HAVE_AGENT_GRPC
 #include "AgentGrpcClient.h"
+#include "AvatarGrpcClient.h"
 #endif
 // 注意: jsoncpp依赖已由protobuf替代，此文件不再直接使用jsoncpp
 
@@ -95,6 +96,9 @@ void ClientSession::OnMessageReceived(const TcpConnectionPtr& conn,
         break;
     case msg_type_getchathistory:
         OnGetChatHistoryResponse(conn, msg);
+        break;
+    case msg_type_avatarupload:
+        OnAvatarUploadResponse(conn, msg);
         break;
     case msg_type_chat:
         OnChatResponse(conn, msg);
@@ -974,4 +978,52 @@ void ClientSession::SendUserStatusChangeMsg(int32_t userid, int type)
     m_codec->send(m_conn, container);
     printf("%s(%d): %s, userid=%d, type=%d\r\n",
         __FILE__, __LINE__, __FUNCTION__, userid, type);
+}
+
+// ============================================================
+// 头像上传 (cmd=1012)
+// ============================================================
+void ClientSession::OnAvatarUploadResponse(const TcpConnectionPtr& conn,
+                                            const im::MessageContainer& msg)
+{
+    im::AvatarUploadReq req;
+    im::AvatarUploadRsp rsp;
+
+    if (!req.ParseFromString(msg.payload())) {
+        rsp.set_code(1);
+        rsp.set_msg("解析请求失败");
+    } else {
+#ifdef HAVE_AGENT_GRPC
+        IMSer& imserver = Singleton<IMSer>::instance();
+        AvatarGrpcClient* avatar = imserver.GetAvatarClient();
+        if (avatar) {
+            auto result = avatar->Upload(m_user->userid,
+                                         req.image_data(), req.format());
+            if (result.ok) {
+                rsp.set_code(0);
+                rsp.set_msg("上传成功");
+                rsp.set_url(result.url);
+
+                // 更新用户的 customface
+                m_user->customface = result.url;
+                Singleton<UserManager>::instance().UpdateUserInfo(*m_user);
+            } else {
+                rsp.set_code(2);
+                rsp.set_msg(result.errMsg);
+            }
+        } else {
+            rsp.set_code(3);
+            rsp.set_msg("Avatar服务未配置");
+        }
+#else
+        rsp.set_code(3);
+        rsp.set_msg("Avatar服务未编译 (需gRPC)");
+#endif
+    }
+
+    im::MessageContainer response;
+    response.set_cmd(msg_type_avatarupload);
+    response.set_seq(m_seq);
+    response.set_payload(rsp.SerializeAsString());
+    m_codec->send(conn, response);
 }
