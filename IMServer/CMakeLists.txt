@@ -30,33 +30,61 @@ find_package(Protobuf REQUIRED)
 # 编译 .proto 文件生成 C++ 代码
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/im.proto)
 
-# --- gRPC 依赖（Agent 通信）---
+# --- gRPC 依赖（Agent/Avatar 通信）---
 find_package(gRPC CONFIG QUIET)
 if(gRPC_FOUND)
-    message(STATUS "gRPC found, enabling Agent gRPC client")
+    message(STATUS "gRPC found, enabling gRPC clients")
 
-    # 生成 agent.proto 的 gRPC C++ 代码
+    # 查找 protoc 和 grpc_cpp_plugin
     get_target_property(GRPC_CPP_PLUGIN gRPC::grpc_cpp_plugin LOCATION)
+
+    # ── 自定义函数：生成 gRPC C++ 代码 ──
+    # protobuf_generate_grpc_cpp 不是 CMake 内置函数，需手动定义
+    function(protobuf_generate_grpc_cpp SRCS HDRS PROTO)
+        get_filename_component(PROTO_DIR ${PROTO} DIRECTORY)
+        get_filename_component(PROTO_NAME ${PROTO} NAME_WE)
+        set(GRPC_SRC ${CMAKE_CURRENT_BINARY_DIR}/${PROTO_NAME}.grpc.pb.cc)
+        set(GRPC_HDR ${CMAKE_CURRENT_BINARY_DIR}/${PROTO_NAME}.grpc.pb.h)
+        add_custom_command(
+            OUTPUT ${GRPC_SRC} ${GRPC_HDR}
+            COMMAND ${Protobuf_PROTOC_EXECUTABLE}
+                --proto_path=${PROTO_DIR}
+                --grpc_out=${CMAKE_CURRENT_BINARY_DIR}
+                --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN}
+                ${PROTO}
+            DEPENDS ${PROTO}
+            COMMENT "Generating gRPC code for ${PROTO_NAME}"
+        )
+        set(${SRCS} ${GRPC_SRC} PARENT_SCOPE)
+        set(${HDRS} ${GRPC_HDR} PARENT_SCOPE)
+    endfunction()
+
+    # agent.proto
     protobuf_generate_cpp(AGENT_PROTO_SRCS AGENT_PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/agent.proto)
-    protobuf_generate_grpc_cpp(AGENT_GRPC_SRCS AGENT_GRPC_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/agent.proto
-        PLUGIN "protoc-gen-grpc=${GRPC_CPP_PLUGIN}")
+    protobuf_generate_grpc_cpp(AGENT_GRPC_SRCS AGENT_GRPC_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/agent.proto)
 
     # avatar.proto
     protobuf_generate_cpp(AVATAR_PROTO_SRCS AVATAR_PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/avatar.proto)
-    protobuf_generate_grpc_cpp(AVATAR_GRPC_SRCS AVATAR_GRPC_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/avatar.proto
-        PLUGIN "protoc-gen-grpc=${GRPC_CPP_PLUGIN}")
+    protobuf_generate_grpc_cpp(AVATAR_GRPC_SRCS AVATAR_GRPC_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/avatar.proto)
+
+    # mail.proto
+    protobuf_generate_cpp(MAIL_PROTO_SRCS MAIL_PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/mail.proto)
+    protobuf_generate_grpc_cpp(MAIL_GRPC_SRCS MAIL_GRPC_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/mail.proto)
 
     set(AGENT_SRCS
         AgentGrpcClient.cpp
         AvatarGrpcClient.cpp
+        MailGrpcClient.cpp
         ${AGENT_PROTO_SRCS}
         ${AGENT_GRPC_SRCS}
         ${AVATAR_PROTO_SRCS}
         ${AVATAR_GRPC_SRCS}
+        ${MAIL_PROTO_SRCS}
+        ${MAIL_GRPC_SRCS}
     )
     add_definitions(-DHAVE_AGENT_GRPC)
 else()
-    message(WARNING "gRPC not found, Agent gRPC client disabled. "
+    message(WARNING "gRPC not found, gRPC clients disabled. "
                     "Install: apt install libgrpc++-dev protobuf-compiler-grpc")
     set(AGENT_SRCS "")
 endif()

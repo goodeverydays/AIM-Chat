@@ -47,9 +47,10 @@ bool UserManager::AddUser(User& user)
 {
 	stringstream sql;
 	m_baseUserID++;//自增用户ID基数，确保每个用户都有一个唯一的ID
-	sql << "INSERT INTO t_user (f_user_id, f_username, f_nickname, f_password, f_register_time)" <<
+	sql << "INSERT INTO t_user (f_user_id, f_username, f_nickname, f_password, f_mail, f_register_time)" <<
 		"VALUES (" << m_baseUserID << ", '" << EscapeSqlString(user.username) << "', '"
-		<< EscapeSqlString(user.nickname) << "', '" << EscapeSqlString(user.password) << "', NOW())";
+		<< EscapeSqlString(user.nickname) << "', '" << EscapeSqlString(user.password) << "', '"
+		<< EscapeSqlString(user.mail) << "', NOW())";
 	//构造SQL插入语句，将用户信息插入到数据库中，假设t_user表已经存在，并且包含相应的字段
 	bool result = Singleton<MySqlManager>::instance().Execute(sql.str());//调用MySqlManager的Execute方法执行SQL语句，如果执行失败，则输出错误信息并返回false
 	if(result == false)
@@ -64,8 +65,11 @@ bool UserManager::AddUser(User& user)
 	user.ownerid = 0;//设置用户的默认群主ID，可以根据需要进行修改，例如设置为一个特定的值来表示没有群主或者其他情况
 	{
 		lock_guard<mutex> guard(m_mutex);//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
-		m_cachedUsers.push_back(std::make_shared<User>(user));//将用户对象拷贝到堆上并添加到缓存列表中
-		m_mapUsers[user.userid] = make_shared<User>(user);//同步加入映射表，确保新注册用户可被MakeFriendRelationship等查找
+		// 两个索引（按名遍历的列表 / 按ID查找的映射）必须共享同一个 User 对象，
+		// 否则好友关系、头像等字段在一处更新后，另一处会读到过期数据
+		UserPtr sp = std::make_shared<User>(user);
+		m_cachedUsers.push_back(sp);//将用户对象拷贝到堆上并添加到缓存列表中
+		m_mapUsers[user.userid] = sp;//同步加入映射表，确保新注册用户可被MakeFriendRelationship等查找
 	}
 	return true;
 }
@@ -101,8 +105,12 @@ bool UserManager::LoadUserFromDB()
 		u.mail = pRow[11].GetString();
 		{
 			lock_guard<mutex> guard(m_mutex);//使用lock_guard对象自动管理互斥锁的锁定和释放，确保在访问和修改用户信息时线程安全，避免数据竞争和不一致的问题
-			m_cachedUsers.push_back(std::make_shared<User>(u));
-			m_mapUsers[u.userid] = make_shared<User>(u);
+			// 两个索引共享同一个 User 对象（关键：init() 加载好友关系时只填充
+			// m_cachedUsers 中的对象，若此处是两份拷贝，m_mapUsers 里的 friends 将永远为空，
+			// 导致 GetFriendInfoByUserID 查不到好友、头像/上线通知无法推送）
+			UserPtr sp = std::make_shared<User>(u);
+			m_cachedUsers.push_back(sp);
+			m_mapUsers[u.userid] = sp;
 		}
 		if(u.userid < 0xFFFFFFF && u.userid > m_baseUserID)
 		{
@@ -313,8 +321,10 @@ bool UserManager::AddGroup(const char* groupname, int32_t ownerid, int32_t& grou
 	group.birthday = 20000101;
 	{
 		lock_guard<mutex> guard(m_mutex);
-		m_cachedUsers.push_back(std::make_shared<User>(group));
-		m_mapUsers[groupid] = make_shared<User>(group);
+		// 两个索引共享同一个 User 对象，保持数据一致
+		UserPtr sp = std::make_shared<User>(group);
+		m_cachedUsers.push_back(sp);
+		m_mapUsers[groupid] = sp;
 	}
 	return true;
 }

@@ -6,6 +6,7 @@
 #ifdef HAVE_AGENT_GRPC
 #include "AgentGrpcClient.h"
 #include "AvatarGrpcClient.h"
+#include "MailGrpcClient.h"
 #endif
 // 注意: jsoncpp依赖已由protobuf替代，此文件不再直接使用jsoncpp
 
@@ -100,6 +101,9 @@ void ClientSession::OnMessageReceived(const TcpConnectionPtr& conn,
     case msg_type_avatarupload:
         OnAvatarUploadResponse(conn, msg);
         break;
+    case msg_type_sendemailcode:
+        OnSendEmailCodeResponse(conn, msg);
+        break;
     case msg_type_chat:
         OnChatResponse(conn, msg);
         break;
@@ -146,30 +150,55 @@ void ClientSession::OnRegisterResponse(const TcpConnectionPtr& conn,
         rsp.set_code(101);
         rsp.set_msg("protobuf parse failed!");
     }
-    else if (req.username().empty() || req.nickname().empty() || req.password().empty())
+    else if (req.username().empty() || req.nickname().empty() || req.password().empty()
+             || req.email().empty() || req.code().empty())
     {
         rsp.set_code(102);
         rsp.set_msg("data field missing!");
     }
     else
     {
-        // 构建User对象并尝试注册
-        User user;
-        user.username = req.username();
-        user.nickname = req.nickname();
-        user.password = req.password();
-
-        if (!Singleton<UserManager>::instance().AddUser(user))
-        {
-            rsp.set_code(100);
-            rsp.set_msg("register failed!");
-            printf("%s(%d): %s - add user failed\r\n", __FILE__, __LINE__, __FUNCTION__);
+        bool emailVerified = false;
+#ifdef HAVE_AGENT_GRPC
+        IMSer& imserver = Singleton<IMSer>::instance();
+        MailGrpcClient* mail = imserver.GetMailClient();
+        if (mail) {
+            auto result = mail->VerifyCode(req.email(), req.code());
+            emailVerified = result.ok;
+            if (!emailVerified) {
+                rsp.set_code(104);
+                rsp.set_msg(result.msg.empty() ? "验证码错误或已过期" : result.msg);
+            }
+        } else {
+            rsp.set_code(104);
+            rsp.set_msg("邮件服务未配置");
         }
-        else
+#else
+        rsp.set_code(104);
+        rsp.set_msg("邮件服务未编译 (需gRPC)");
+#endif
+
+        if (emailVerified)
         {
-            rsp.set_code(0);
-            rsp.set_msg("ok");
-            printf("%s(%d): %s - register success\r\n", __FILE__, __LINE__, __FUNCTION__);
+            // 构建User对象并尝试注册
+            User user;
+            user.username = req.username();
+            user.nickname = req.nickname();
+            user.password = req.password();
+            user.mail = req.email();
+
+            if (!Singleton<UserManager>::instance().AddUser(user))
+            {
+                rsp.set_code(100);
+                rsp.set_msg("register failed!");
+                printf("%s(%d): %s - add user failed\r\n", __FILE__, __LINE__, __FUNCTION__);
+            }
+            else
+            {
+                rsp.set_code(0);
+                rsp.set_msg("ok");
+                printf("%s(%d): %s - register success\r\n", __FILE__, __LINE__, __FUNCTION__);
+            }
         }
     }
 
@@ -960,13 +989,16 @@ void ClientSession::OnAddGroupResponse(const TcpConnectionPtr& conn, int32_t gro
 
 // ============================================================
 // 发送用户状态变更通知
-// 通知: UserStatusChangeNotify { type, userid }
+// 通知: UserStatusChangeNotify { type, userid, customface }
 // ============================================================
-void ClientSession::SendUserStatusChangeMsg(int32_t userid, int type)
+void ClientSession::SendUserStatusChangeMsg(int32_t userid, int type, const std::string& customface)
 {
     im::UserStatusChangeNotify notify;
     notify.set_type(type);
     notify.set_userid(userid);
+    if (!customface.empty()) {
+        notify.set_customface(customface);
+    }
 
     im::MessageContainer container;
     container.set_cmd(msg_type_userstatuschange);
@@ -1005,6 +1037,18 @@ void ClientSession::OnAvatarUploadResponse(const TcpConnectionPtr& conn,
                 // 更新用户的 customface
                 m_user->customface = result.url;
                 Singleton<UserManager>::instance().UpdateUserInfo(m_user->userid, *m_user);
+
+                // 通知在线好友刷新头像
+                IMSer& imserver = Singleton<IMSer>::instance();
+                std::list<UserPtr> lstFriend;
+                if (Singleton<UserManager>::instance().GetFriendInfoByUserID(m_user->userid, lstFriend)) {
+                    for (const auto& friendUser : lstFriend) {
+                        ClientSessionPtr targetSession = imserver.GetSessionByID(friendUser->userid);
+                        if (targetSession) {
+                            targetSession->SendUserStatusChangeMsg(m_user->userid, 5, result.url);
+                        }
+                    }
+                }
             } else {
                 rsp.set_code(2);
                 rsp.set_msg(result.errMsg);
@@ -1021,6 +1065,49 @@ void ClientSession::OnAvatarUploadResponse(const TcpConnectionPtr& conn,
 
     im::MessageContainer response;
     response.set_cmd(msg_type_avatarupload);
+    response.set_seq(m_seq);
+    response.set_payload(rsp.SerializeAsString());
+    m_codec->send(conn, response);
+}
+
+// ============================================================
+// 发送邮箱验证码 (cmd=1013)
+// ============================================================
+void ClientSession::OnSendEmailCodeResponse(const TcpConnectionPtr& conn,
+                                             const im::MessageContainer& msg)
+{
+    im::SendEmailCodeReq req;
+    im::SendEmailCodeRsp rsp;
+
+    if (!req.ParseFromString(msg.payload())) {
+        rsp.set_code(3);
+        rsp.set_msg("解析请求失败");
+    } else if (req.email().empty() ||
+               req.email().find('@') == std::string::npos ||
+               req.email().find('.') == std::string::npos) {
+        rsp.set_code(2);
+        rsp.set_msg("邮箱格式错误");
+    } else {
+#ifdef HAVE_AGENT_GRPC
+        IMSer& imserver = Singleton<IMSer>::instance();
+        MailGrpcClient* mail = imserver.GetMailClient();
+        if (mail) {
+            auto result = mail->SendCode(req.email());
+            rsp.set_code(result.code);
+            rsp.set_msg(result.msg);
+            rsp.set_cooldown_seconds(result.cooldownSeconds);
+        } else {
+            rsp.set_code(3);
+            rsp.set_msg("邮件服务未配置");
+        }
+#else
+        rsp.set_code(3);
+        rsp.set_msg("邮件服务未编译 (需gRPC)");
+#endif
+    }
+
+    im::MessageContainer response;
+    response.set_cmd(msg_type_sendemailcode);
     response.set_seq(m_seq);
     response.set_payload(rsp.SerializeAsString());
     m_codec->send(conn, response);

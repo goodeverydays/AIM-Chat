@@ -49,6 +49,7 @@ enum {
     msg_type_getgroupmembers,
     msg_type_getchathistory,
     msg_type_avatarupload,     // 1012: 上传头像
+    msg_type_sendemailcode,    // 1013: 发送邮箱验证码
     // 聊天消息
     msg_type_chat = 1100,   // 单聊消息
     msg_type_multichat,     // 群发消息
@@ -107,12 +108,13 @@ protected:
     void OnGetGroupMembersResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
     void OnGetChatHistoryResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
     void OnAvatarUploadResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
+    void OnSendEmailCodeResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
     void OnChatResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
     void OnMultiChatResponse(const TcpConnectionPtr& conn, const im::MessageContainer& msg);
 
     void DeleteFriend(const TcpConnectionPtr& conn, int32_t friendid);
     void OnAddGroupResponse(const TcpConnectionPtr& conn, int32_t groupid);
-    void SendUserStatusChangeMsg(int32_t userid, int type);
+    void SendUserStatusChangeMsg(int32_t userid, int type, const std::string& customface = "");
 
 private:
     std::string m_sessionid;                            // 会话唯一标识

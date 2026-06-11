@@ -40,6 +40,7 @@ message MessageContainer {
     // cmd=1008 → ModifyPasswordReq / CommonRsp
     // cmd=1009 → CreateGroupReq / CreateGroupRsp
     // cmd=1010 → GetGroupMembersReq / GetGroupMembersRsp
+    // cmd=1013 → SendEmailCodeReq / SendEmailCodeRsp
     // cmd=1100 → ChatMsg
     // cmd=1101 → MultiChatTargets
     bytes payload   = 5;
@@ -79,11 +80,26 @@ message RegisterReq {
     string username = 1;   // 手机号
     string nickname = 2;   // 昵称
     string password = 3;   // 密码
+    string email    = 4;   // 邮箱（需通过验证码校验）
+    string code     = 5;   // 邮箱验证码
 }
 
 message RegisterRsp {
     int32 code    = 1;
     string msg    = 2;
+}
+
+// ============================================================
+// 发送邮箱验证码 (cmd=1013)
+// ============================================================
+message SendEmailCodeReq {
+    string email = 1;
+}
+
+message SendEmailCodeRsp {
+    int32  code             = 1;   // 0=成功, 1=冷却中, 2=邮箱格式错误, 3=发送失败
+    string msg              = 2;
+    int32  cooldown_seconds = 3;   // 距下次可发送的剩余秒数（仅 code=1 时有意义）
 }
 
 // ============================================================
@@ -144,8 +160,9 @@ message OperateFriendRsp {
 // 由服务端推送给好友，无需请求
 // ============================================================
 message UserStatusChangeNotify {
-    int32 type   = 1;    // 1=上线, 0=离线, 3=被删除好友
-    int32 userid = 2;
+    int32  type       = 1;    // 1=上线, 0=离线, 3=被删除好友, 4=被添加好友, 5=头像更新
+    int32  userid     = 2;
+    string customface = 3;    // 仅 type=5 时携带新的头像URL
 }
 
 // ============================================================

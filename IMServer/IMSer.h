@@ -16,6 +16,7 @@ class ClientSession;//前向声明，避免与ClientSession.h的循环依赖
 #ifdef HAVE_AGENT_GRPC
 #include "AgentGrpcClient.h"
 #include "AvatarGrpcClient.h"
+#include "MailGrpcClient.h"
 #endif
 
 class IMSer final//final关键字表示这个类不能被继承，确保IMSer类的设计和实现不会被修改或扩展，保持其稳定性和安全性
@@ -30,6 +31,7 @@ public:
 #ifdef HAVE_AGENT_GRPC
 	AgentGrpcClient* GetAgentClient();    // 获取 Agent gRPC 客户端
 	AvatarGrpcClient* GetAvatarClient();  // 获取 Avatar gRPC 客户端
+	MailGrpcClient* GetMailClient();      // 获取 Mail gRPC 客户端
 #endif
 
 protected:
@@ -42,6 +44,7 @@ private:
 #ifdef HAVE_AGENT_GRPC
 	std::unique_ptr<AgentGrpcClient> m_agentClient;    // Agent gRPC 客户端
 	std::unique_ptr<AvatarGrpcClient> m_avatarClient;   // Avatar gRPC 客户端
+	std::unique_ptr<MailGrpcClient> m_mailClient;       // Mail gRPC 客户端
 #endif
 };
 typedef std::pair<std::string, std::shared_ptr<ClientSession>> ConnPair;//定义一个连接对，包含连接ID和连接对象

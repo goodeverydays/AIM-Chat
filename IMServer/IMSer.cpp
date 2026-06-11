@@ -15,6 +15,7 @@ bool IMSer::init(const std::string& ip, short port, EventLoop* loop)
 	// 初始化 gRPC 客户端（连接微服务）
 	m_agentClient.reset(new AgentGrpcClient("127.0.0.1:19527"));
 	m_avatarClient.reset(new AvatarGrpcClient("127.0.0.1:19529"));
+	m_mailClient.reset(new MailGrpcClient("127.0.0.1:19531"));
 #endif
 
 	return true;
@@ -71,5 +72,10 @@ AgentGrpcClient* IMSer::GetAgentClient()
 AvatarGrpcClient* IMSer::GetAvatarClient()
 {
 	return m_avatarClient.get();
+}
+
+MailGrpcClient* IMSer::GetMailClient()
+{
+	return m_mailClient.get();
 }
 #endif
